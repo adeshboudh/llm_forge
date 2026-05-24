@@ -1,0 +1,36 @@
+# BPE Tokenizer Config — 32k vocab
+# Used by: tokenizer/train_tokenizer.py
+#
+# To train:
+#   python tokenizer/train_tokenizer.py \
+#     --vocab-size 32768 \
+#     --char-budget 1_000_000_000 \
+#     --output-dir tokenizer/saved/
+#
+# Upload output to Kaggle Dataset: llm-forge-tokenizer-v1
+
+tokenizer:
+  vocab_size: 32768          # 2^15, uint16-safe
+  char_budget: 1_000_000_000 # ~1GB text from FineWeb-Edu for training BPE
+  output_dir: tokenizer/saved/
+
+special_tokens:              # LOCKED — never change after first .npy shard write
+  "<|endoftext|>": 0         # document separator
+  "<|pad|>":        1
+  "<|unk|>":        2
+  "<|bos|>":        3
+  "<|eos|>":        4
+
+vocab_layout:
+  special : "0–4      (5 tokens)"
+  bytes   : "5–260    (256 tokens, raw UTF-8 bytes)"
+  merges  : "261–32767 (32507 learned BPE merges)"
+
+pretokenization:
+  pattern: gpt2              # GPT-2 regex — splits contractions, words, digits
+  byte_level: true           # handles all Unicode via UTF-8 bytes
+
+output_files:
+  - tokenizer.json           # canonical — load.py uses only this
+  - vocab.json               # human-readable {token_repr: id}
+  - merges.txt               # human-readable merge history

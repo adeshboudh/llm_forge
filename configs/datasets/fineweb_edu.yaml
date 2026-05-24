@@ -1,0 +1,47 @@
+# FineWeb-Edu Dataset Config
+# Used by: data/pipeline.py
+#
+# To build shards:
+#   python data/pipeline.py \
+#     --tokenizer  tokenizer/saved/tokenizer.json \
+#     --output-dir data/shards/ \
+#     --token-budget 10_000_000_000 \
+#     --dataset-version v1-bpe32k-fineweb10BT
+#
+# Upload output to Kaggle Dataset: llm-forge-tokens-v1
+
+source:
+  name: HuggingFaceFW/fineweb-edu
+  config: sample-10BT          # ~10B tokens, ~38GB compressed
+  split: train
+  text_field: text
+  min_doc_len: 100             # skip docs shorter than 100 chars
+
+pipeline:
+  tokenizer: tokenizer/saved/tokenizer.json
+  shard_size: 50_000_000       # tokens per shard (~100MB at uint16)
+  dtype: uint16                # 0–32767 fits; 50% smaller than int32
+
+# Token budgets per model size (see CLAUDE.md scaling targets)
+token_budgets:
+  smoke_test:  100_000_000     # 100M tokens — fast pipeline validation
+  model_25m:   1_000_000_000   # 1B tokens
+  model_125m:  5_000_000_000   # 5B tokens
+  model_350m: 10_000_000_000   # 10B tokens (full sample-10BT)
+
+# Dataset versions — bump when tokenizer changes, NEVER overwrite shards
+versions:
+  v1-bpe32k-fineweb1B:
+    token_budget: 1_000_000_000
+    tokenizer: bpe_32k
+    notes: smoke run, 25M model training
+  v1-bpe32k-fineweb5B:
+    token_budget: 5_000_000_000
+    tokenizer: bpe_32k
+    notes: 125M model training
+  v1-bpe32k-fineweb10BT:
+    token_budget: 10_000_000_000
+    tokenizer: bpe_32k
+    notes: 350M model training, full sample-10BT
+
+kaggle_dataset: llm-forge-tokens-v1
