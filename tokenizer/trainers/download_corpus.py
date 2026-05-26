@@ -133,6 +133,14 @@ def main() -> None:
         file=sys.stderr,
     )
 
+    # HuggingFace streaming keeps background download threads alive.
+    # Normal Python exit waits for them → pipe never closes → Rust hangs.
+    # os._exit() bypasses thread cleanup: stdout flushed, pipe closed immediately.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    import os
+    os._exit(0)
+
 
 if __name__ == "__main__":
     main()
