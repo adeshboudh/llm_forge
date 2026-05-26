@@ -6,7 +6,7 @@
 //! Usage:
 //!
 //!   # Pipe from Python downloader
-//!   python tokenizer/trainers/download_corpus.py | \
+//!   python3 tokenizer/trainers/download_corpus.py | \
 //!       ./target/release/bpe-trainer --output-dir tokenizer/saved/
 //!
 //!   # From file
@@ -58,38 +58,38 @@ fn main() {
     );
 
     // --- Header ---
-    println!("================================================================");
-    println!("BPE Tokenizer Training (Rust)");
-    println!("================================================================");
-    println!("  vocab_size : {}", args.vocab_size);
-    println!("  n_merges   : {}", args.vocab_size - 261);
-    println!("  output_dir : {}", args.output_dir.display());
-    println!(
+    eprintln!("================================================================");
+    eprintln!("BPE Tokenizer Training (Rust)");
+    eprintln!("================================================================");
+    eprintln!("  vocab_size : {}", args.vocab_size);
+    eprintln!("  n_merges   : {}", args.vocab_size - 261);
+    eprintln!("  output_dir : {}", args.output_dir.display());
+    eprintln!(
         "  input      : {}",
         args.input
             .as_deref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "stdin".to_string())
     );
-    println!("================================================================");
+    eprintln!("================================================================");
 
     let t_start = Instant::now();
 
     // --- Read input ---
-    println!("\nReading text...");
+    eprintln!("\nReading text...");
     let t0 = Instant::now();
-    let text = read_input(args.input.as_deref()).expect("Failed to read input");
-    println!(
-        "  {:.2}GB chars read in {:.1}s",
+    let text = read_input_with_progress(args.input.as_deref()).expect("Failed to read input");
+    eprintln!(
+        "  {:.3}B chars read in {:.1}s",
         text.len() as f64 / 1e9,
         t0.elapsed().as_secs_f32()
     );
 
     // --- Pretokenize ---
-    println!("\nPretokenizing (GPT-2 regex)...");
+    eprintln!("\nPretokenizing (GPT-2 regex)...");
     let t1 = Instant::now();
     let word_freqs = pretokenize::build_word_freqs(&text);
-    println!(
+    eprintln!(
         "  {} unique pre-tokens in {:.1}s",
         word_freqs.len(),
         t1.elapsed().as_secs_f32()
@@ -97,11 +97,11 @@ fn main() {
 
     // --- BPE training ---
     let n_merges = args.vocab_size - 261;
-    println!("\nLearning {} BPE merges...", n_merges);
+    eprintln!("\nLearning {} BPE merges...", n_merges);
     let t2 = Instant::now();
     let mut trainer = bpe::BpeTrainer::new(args.vocab_size, args.log_every);
-    trainer.train(word_freqs);
-    println!(
+    trainer.train(word_freqs, t2);
+    eprintln!(
         "  {} merges learned in {:.1}s ({:.1} min)",
         trainer.merges.len(),
         t2.elapsed().as_secs_f32(),
@@ -109,35 +109,59 @@ fn main() {
     );
 
     // --- Serialize ---
-    println!("\nWriting output to {}...", args.output_dir.display());
+    eprintln!("\nWriting output to {}...", args.output_dir.display());
     fs::create_dir_all(&args.output_dir).expect("Failed to create output directory");
     serialize::save(&trainer, &args.output_dir).expect("Failed to write tokenizer files");
-    println!("  tokenizer.json  (canonical — load with load.py)");
-    println!("  vocab.json      (human inspection)");
-    println!("  merges.txt      (human inspection)");
+    eprintln!("  tokenizer.json  (canonical — load with load.py)");
+    eprintln!("  vocab.json      (human inspection)");
+    eprintln!("  merges.txt      (human inspection)");
 
     let elapsed = t_start.elapsed();
-    println!("\n================================================================");
-    println!(
+    eprintln!("\n================================================================");
+    eprintln!(
         "Done in {:.1}s ({:.1} min)",
         elapsed.as_secs_f32(),
         elapsed.as_secs_f32() / 60.0
     );
-    println!("================================================================");
+    eprintln!("================================================================");
 }
 
 // ---------------------------------------------------------------------------
-// Input reader
+// Input reader with progress
 // ---------------------------------------------------------------------------
 
-fn read_input(path: Option<&Path>) -> io::Result<String> {
-    match path {
-        Some(p) => fs::read_to_string(p),
-        None => {
-            // Read all stdin into string
-            let mut text = String::new();
-            io::stdin().lock().read_to_string(&mut text)?;
-            Ok(text)
+/// Read from file or stdin, printing bytes received to stderr every 50MB.
+fn read_input_with_progress(path: Option<&Path>) -> io::Result<String> {
+    const CHUNK: usize = 1 << 20; // 1MB per read
+    const REPORT_EVERY: usize = 50 * 1024 * 1024; // report every 50MB
+
+    let mut buf = vec![0u8; CHUNK];
+    let mut bytes: Vec<u8> = Vec::with_capacity(1 << 30); // pre-alloc 1GB
+
+    let mut source: Box<dyn Read> = match path {
+        Some(p) => Box::new(fs::File::open(p)?),
+        None    => Box::new(io::stdin()),
+    };
+
+    let mut last_report = 0usize;
+
+    loop {
+        let n = source.read(&mut buf)?;
+        if n == 0 { break; }
+        bytes.extend_from_slice(&buf[..n]);
+
+        if bytes.len() - last_report >= REPORT_EVERY {
+            last_report = bytes.len();
+            eprint!("\r  {:.3}B chars received...", bytes.len() as f64 / 1e9);
+            // flush stderr so progress shows immediately
+            use std::io::Write;
+            let _ = io::stderr().flush();
         }
     }
+
+    if last_report > 0 {
+        eprintln!(); // newline after \r progress line
+    }
+
+    String::from_utf8(bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }

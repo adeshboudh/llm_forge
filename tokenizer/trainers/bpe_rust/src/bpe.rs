@@ -18,6 +18,7 @@
 
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::time::Instant;
 
 pub struct BpeTrainer {
     pub vocab_size: usize,
@@ -40,7 +41,8 @@ impl BpeTrainer {
     }
 
     /// Train BPE on a word-frequency table (consumed in-place).
-    pub fn train(&mut self, mut word_freqs: HashMap<Vec<u32>, u64>) {
+    /// `t_start` is passed in so ETA is computed from actual merge-loop start.
+    pub fn train(&mut self, mut word_freqs: HashMap<Vec<u32>, u64>, t_start: Instant) {
         let n_merges = self.vocab_size.saturating_sub(self.next_id as usize);
 
         for i in 0..n_merges {
@@ -68,13 +70,16 @@ impl BpeTrainer {
 
             if self.log_every > 0 && (i + 1) % self.log_every == 0 {
                 let (a, b) = best_pair;
+                let elapsed   = t_start.elapsed().as_secs_f64();
+                let rate      = elapsed / (i + 1) as f64;          // sec/merge
+                let remaining = (n_merges - i - 1) as f64;
+                let eta_s     = (rate * remaining) as u64;
+                let eta_str   = format!("{}h {:02}m {:02}s",
+                    eta_s / 3600, (eta_s % 3600) / 60, eta_s % 60);
                 eprintln!(
-                    "  [{:>6}/{:>6}] merge ({}, {}) -> {}",
-                    i + 1,
-                    n_merges,
-                    a,
-                    b,
-                    new_id
+                    "  [{:>6}/{:>6}]  ({}, {}) -> {}  |  elapsed {:.0}m  ETA {}",
+                    i + 1, n_merges, a, b, new_id,
+                    elapsed / 60.0, eta_str,
                 );
             }
         }
