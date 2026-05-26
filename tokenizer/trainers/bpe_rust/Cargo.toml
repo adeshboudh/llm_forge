@@ -20,6 +20,9 @@ serde_json = "1.0"
 # CLI argument parsing
 clap = { version = "4.0", features = ["derive"] }
 
+# Data parallelism — count_pairs and apply_merge across all cores
+rayon = "1.10"
+
 [profile.release]
 opt-level      = 3
 lto            = true
