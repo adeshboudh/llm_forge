@@ -22,10 +22,11 @@ mod pretokenize;
 mod serialize;
 
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Fast BPE tokenizer trainer.
 /// Reads text from stdin (pipe) or --input file. Outputs load.py-compatible tokenizer.json.
@@ -76,33 +77,34 @@ fn main() {
     let t_start = Instant::now();
 
     // --- Read input ---
-    eprintln!("\nReading text...");
+    let spinner = new_spinner("Reading text...");
     let t0 = Instant::now();
-    let text = read_input_with_progress(args.input.as_deref()).expect("Failed to read input");
-    eprintln!(
-        "  {:.3}B chars read in {:.1}s",
+    let text = read_input_with_progress(args.input.as_deref(), &spinner)
+        .expect("Failed to read input");
+    spinner.finish_with_message(format!(
+        "Read {:.3}B chars in {:.1}s",
         text.len() as f64 / 1e9,
         t0.elapsed().as_secs_f32()
-    );
+    ));
 
     // --- Pretokenize ---
-    eprintln!("\nPretokenizing (GPT-2 regex)...");
+    let spinner = new_spinner("Pretokenizing (GPT-2 regex)...");
     let t1 = Instant::now();
     let word_freqs = pretokenize::build_word_freqs(&text);
-    eprintln!(
-        "  {} unique pre-tokens in {:.1}s",
+    spinner.finish_with_message(format!(
+        "{} unique pre-tokens in {:.1}s",
         word_freqs.len(),
         t1.elapsed().as_secs_f32()
-    );
+    ));
 
     // --- BPE training ---
     let n_merges = args.vocab_size - 261;
     eprintln!("\nLearning {} BPE merges...", n_merges);
     let t2 = Instant::now();
     let mut trainer = bpe::BpeTrainer::new(args.vocab_size, args.log_every);
-    trainer.train(word_freqs, t2);
+    trainer.train(word_freqs);
     eprintln!(
-        "  {} merges learned in {:.1}s ({:.1} min)",
+        "  {} merges in {:.1}s ({:.1} min)",
         trainer.merges.len(),
         t2.elapsed().as_secs_f32(),
         t2.elapsed().as_secs_f32() / 60.0
@@ -127,13 +129,25 @@ fn main() {
 }
 
 // ---------------------------------------------------------------------------
-// Input reader with progress
+// Helpers
 // ---------------------------------------------------------------------------
 
-/// Read from file or stdin, printing bytes received to stderr every 50MB.
-fn read_input_with_progress(path: Option<&Path>) -> io::Result<String> {
-    const CHUNK: usize = 1 << 20; // 1MB per read
-    const REPORT_EVERY: usize = 50 * 1024 * 1024; // report every 50MB
+fn new_spinner(msg: &str) -> ProgressBar {
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap(),
+    );
+    pb.set_message(msg.to_string());
+    pb.enable_steady_tick(Duration::from_millis(120));
+    pb
+}
+
+/// Read from file or stdin, updating spinner message with bytes received.
+fn read_input_with_progress(path: Option<&Path>, spinner: &ProgressBar) -> io::Result<String> {
+    const CHUNK: usize = 1 << 20;          // 1MB read chunks
+    const REPORT_EVERY: usize = 50 << 20;  // update spinner every 50MB
 
     let mut buf = vec![0u8; CHUNK];
     let mut bytes: Vec<u8> = Vec::with_capacity(1 << 30); // pre-alloc 1GB
@@ -152,15 +166,11 @@ fn read_input_with_progress(path: Option<&Path>) -> io::Result<String> {
 
         if bytes.len() - last_report >= REPORT_EVERY {
             last_report = bytes.len();
-            eprint!("\r  {:.3}B chars received...", bytes.len() as f64 / 1e9);
-            // flush stderr so progress shows immediately
-            use std::io::Write;
-            let _ = io::stderr().flush();
+            spinner.set_message(format!(
+                "Reading text... {:.3}B chars received",
+                bytes.len() as f64 / 1e9
+            ));
         }
-    }
-
-    if last_report > 0 {
-        eprintln!(); // newline after \r progress line
     }
 
     String::from_utf8(bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))

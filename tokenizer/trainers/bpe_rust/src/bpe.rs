@@ -16,9 +16,10 @@
 //!   word_freqs  : HashMap<Vec<u32>, u64>   — word (token seq) → frequency
 //!   pair_counts : HashMap<(u32, u32), u64> — pair → total count across all words
 
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::Duration;
 
 pub struct BpeTrainer {
     pub vocab_size: usize,
@@ -41,16 +42,27 @@ impl BpeTrainer {
     }
 
     /// Train BPE on a word-frequency table (consumed in-place).
-    /// `t_start` is passed in so ETA is computed from actual merge-loop start.
-    pub fn train(&mut self, mut word_freqs: HashMap<Vec<u32>, u64>, t_start: Instant) {
+    pub fn train(&mut self, mut word_freqs: HashMap<Vec<u32>, u64>) {
         let n_merges = self.vocab_size.saturating_sub(self.next_id as usize);
+
+        let pb = ProgressBar::new(n_merges as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] \
+                     [{bar:45.cyan/blue}] {pos:>6}/{len} merges  ETA {eta_precise}",
+                )
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        pb.enable_steady_tick(Duration::from_millis(200));
 
         for i in 0..n_merges {
             // Parallel pair count
             let pair_counts = count_pairs_parallel(&word_freqs);
 
             if pair_counts.is_empty() {
-                eprintln!("  No more pairs at step {}. Stopping early.", i);
+                pb.abandon_with_message(format!("No more pairs at step {i}. Stopped early."));
                 break;
             }
 
@@ -67,22 +79,19 @@ impl BpeTrainer {
             // Parallel merge application
             apply_merge_parallel(&mut word_freqs, best_pair, new_id);
             self.merges.push(best_pair);
+            pb.inc(1);
 
+            // Print occasional merge details above the bar (doesn't corrupt it)
             if self.log_every > 0 && (i + 1) % self.log_every == 0 {
                 let (a, b) = best_pair;
-                let elapsed   = t_start.elapsed().as_secs_f64();
-                let rate      = elapsed / (i + 1) as f64;          // sec/merge
-                let remaining = (n_merges - i - 1) as f64;
-                let eta_s     = (rate * remaining) as u64;
-                let eta_str   = format!("{}h {:02}m {:02}s",
-                    eta_s / 3600, (eta_s % 3600) / 60, eta_s % 60);
-                eprintln!(
-                    "  [{:>6}/{:>6}]  ({}, {}) -> {}  |  elapsed {:.0}m  ETA {}",
+                pb.println(format!(
+                    "  [{:>6}/{:>6}]  ({}, {}) -> {}",
                     i + 1, n_merges, a, b, new_id,
-                    elapsed / 60.0, eta_str,
-                );
+                ));
             }
         }
+
+        pb.finish_with_message(format!("{} merges done", self.merges.len()));
     }
 }
 
