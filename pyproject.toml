@@ -1,0 +1,43 @@
+[project]
+name = "llm-forge"
+version = "0.1.0"
+description = "Pet project for learning LLM internals end-to-end: pretraining, post-training, and inference at small, iterable scale."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "adeshboudh" },
+]
+dependencies = [
+    "numpy>=2.0",
+    "datasets>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+# populated as phases land (e.g. llm-forge-train)
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tokenizer", "data"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tokenizer/tests", "data/tests"]
+addopts = "-ra"

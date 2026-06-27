@@ -2,14 +2,17 @@
 # Phase 1: tokenizer (BPE 32k)
 # Phase 2: data pipeline (FineWeb-Edu → uint16 shards)
 # Phase 3+: not yet wired
+#
+# All commands run via `uv` — venv at .venv is managed by uv sync.
+# See pyproject.toml for deps.
 
-PY       := .venv/bin/python
-PYTEST   := .venv/bin/pytest
-RUFF     := .venv/bin/ruff
-PIP      := .venv/bin/pip
+UV       := uv
+PY       := $(UV) run python
+PYTEST   := $(UV) run pytest
+RUFF     := $(UV) run ruff
 
 # ----- shared -----
-.PHONY: help install lint format clean
+.PHONY: help sync install lint format clean
 
 help:
 	@echo "llm_forge Makefile"
@@ -33,7 +36,10 @@ help:
 	@echo "  make data-shards-10b     build 10B-token shards (canonical set; subsets used for 1B/5B training)"
 
 install:
-	$(PIP) install -e ".[dev]"
+	$(UV) sync --extra dev
+
+sync:
+	$(UV) sync --extra dev
 
 lint:
 	$(RUFF) check .
@@ -42,7 +48,7 @@ format:
 	$(RUFF) format .
 
 clean:
-	rm -rf .pytest_cache .ruff_cache **/__pycache__ data/shards data/shards_1b data/shards_smoke
+	rm -rf .pytest_cache .ruff_cache **/__pycache__ data/shards data/shards_smoke
 
 # =============================================================================
 # Phase 1 — Tokenizer (BPE 32k)
