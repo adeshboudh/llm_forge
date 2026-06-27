@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator
 
+from tqdm import tqdm
+
 if TYPE_CHECKING:
     from data.sources.fineweb import Document
     from tokenizer.serialization.load import Tokenizer
@@ -72,13 +74,15 @@ class DocumentTokenizer:
         self,
         documents: Iterator["Document"],
         log_every: int = 100_000,
+        progress: bool = True,
     ) -> Iterator[list[int]]:
         """
         Encode a document stream, yielding token ID lists one doc at a time.
 
         Args:
             documents: Iterator of Document objects.
-            log_every: Print stats every N documents. 0 = silent.
+            log_every: Update postfix every N documents (used with progress).
+            progress:  Show tqdm bar over documents (default True).
 
         Yields:
             list[int]: Token IDs for one document (incl. leading EOT).
@@ -86,19 +90,32 @@ class DocumentTokenizer:
         total_tokens = 0
         total_docs   = 0
 
-        for doc in documents:
+        doc_iter = documents
+        if progress:
+            doc_iter = tqdm(
+                documents,
+                desc="tokenize",
+                unit="doc",
+                mininterval=0.5,
+                dynamic_ncols=True,
+            )
+
+        for doc in doc_iter:
             ids = self.encode_document(doc.text)
             total_tokens += len(ids)
             total_docs   += 1
 
-            if log_every and total_docs % log_every == 0:
-                print(
-                    f"  [tokenize] {total_docs:>8,} docs  "
-                    f"{total_tokens / 1e9:.4f}B tokens  "
-                    f"avg {total_tokens / total_docs:.0f} tok/doc"
-                )
+            if progress and log_every and total_docs % log_every == 0:
+                if isinstance(doc_iter, tqdm):
+                    doc_iter.set_postfix(
+                        tokens=f"{total_tokens / 1e6:.1f}M",
+                        avg=f"{total_tokens / total_docs:.0f}/doc",
+                    )
 
             yield ids
+
+        if progress and isinstance(doc_iter, tqdm):
+            doc_iter.close()
 
         print(
             f"  [tokenize] done: {total_docs:,} docs  "

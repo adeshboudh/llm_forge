@@ -36,11 +36,14 @@ Usage:
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from tqdm import tqdm
 
 
 class ShardWriter:
@@ -51,17 +54,23 @@ class ShardWriter:
         output_dir:  Directory to write shard files. Created if absent.
         shard_size:  Number of tokens per shard (default 50M → ~100MB).
         vocab_size:  Expected vocab size for validation (default 32_768).
+        progress:    Show tqdm bar over total tokens written (default True).
+        token_budget: Total tokens expected (sets tqdm total). None = unknown.
     """
 
     def __init__(
         self,
-        output_dir: str | Path,
-        shard_size: int = 50_000_000,
-        vocab_size: int = 32_768,
+        output_dir:  str | Path,
+        shard_size:  int = 50_000_000,
+        vocab_size:  int = 32_768,
+        progress:    bool = True,
+        token_budget: int | None = None,
     ) -> None:
-        self.output_dir = Path(output_dir)
-        self.shard_size = shard_size
-        self.vocab_size = vocab_size
+        self.output_dir  = Path(output_dir)
+        self.shard_size  = shard_size
+        self.vocab_size  = vocab_size
+        self.progress    = progress
+        self.token_budget = token_budget
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -77,6 +86,18 @@ class ShardWriter:
                 f"Shards already exist in {self.output_dir}. "
                 f"Increment dataset version — never overwrite shards.\n"
                 f"First existing: {existing[0].name}"
+            )
+
+        # Progress bar — updates via update() per token, closes on finalize()
+        self._bar: tqdm | None = None
+        if self.progress:
+            self._bar = tqdm(
+                total=token_budget,
+                desc="shards",
+                unit="tok",
+                mininterval=1.0,
+                dynamic_ncols=True,
+                file=sys.stderr,
             )
 
     # ------------------------------------------------------------------
@@ -118,6 +139,12 @@ class ShardWriter:
         if self._total_tokens == 0:
             raise ValueError("No tokens written — finalize() called on empty writer.")
 
+        if self._bar is not None:
+            self._bar.n = self._total_tokens
+            self._bar.refresh()
+            self._bar.close()
+            self._bar = None
+
         metadata = self._build_metadata(dataset_version)
         meta_path = self.output_dir / "metadata.json"
         with open(meta_path, "w", encoding="utf-8") as f:
@@ -157,12 +184,12 @@ class ShardWriter:
         self._total_tokens += n
         self._shard_index  += 1
 
-        print(
-            f"  [shard] wrote {path.name}  "
-            f"{n / 1e6:.1f}M tokens  "
-            f"{path.stat().st_size / 1e6:.0f} MB  "
-            f"(cumulative: {self._total_tokens / 1e9:.3f}B)"
-        )
+        if self._bar is not None:
+            self._bar.update(n)
+            self._bar.set_postfix(
+                shards=self._shard_index,
+                last=f"{path.name}",
+            )
 
     def _validate_ids(self, ids: list[int]) -> None:
         """Raise if any ID is out of uint16 range."""

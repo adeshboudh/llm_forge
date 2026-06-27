@@ -124,6 +124,7 @@ def main() -> None:
         output_dir=args.output_dir,
         shard_size=args.shard_size,
         vocab_size=tok.vocab_size,
+        token_budget=args.token_budget,
     )
 
     print("\nStreaming and tokenizing...")
@@ -135,7 +136,6 @@ def main() -> None:
         total_tokens += len(token_ids)
 
         if total_tokens >= args.token_budget:
-            print(f"\n  Token budget reached: {total_tokens:,} tokens")
             break
 
     metadata = writer.finalize(dataset_version=args.dataset_version)

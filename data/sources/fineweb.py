@@ -22,6 +22,8 @@ import time
 from dataclasses import dataclass
 from typing import Iterator
 
+from tqdm import tqdm
+
 
 @dataclass(frozen=True)
 class Document:
@@ -61,6 +63,7 @@ class FineWebEduStream:
         split:         str = "train",
         min_doc_len:   int = 100,
         log_every:     int = 100_000,
+        progress:      bool = True,
     ) -> None:
         self.token_budget = token_budget
         self.dataset      = dataset or self.DATASET
@@ -68,15 +71,16 @@ class FineWebEduStream:
         self.split        = split
         self.min_doc_len  = min_doc_len
         self.log_every    = log_every
+        self.progress     = progress
 
     def __iter__(self) -> Iterator[Document]:
         """Yield Document objects until token_budget exhausted."""
         try:
             from datasets import load_dataset
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "'datasets' not installed. Run: pip install datasets"
-            )
+            ) from err
 
         ds = load_dataset(
             self.dataset,
@@ -90,7 +94,19 @@ class FineWebEduStream:
         skipped    = 0
         t0         = time.time()
 
-        for row in ds:
+        # Total dataset size is unknown with streaming — use chars_budget.
+        # Wrap the source row iterator; bar updates per yielded doc.
+        row_iter = ds
+        if self.progress:
+            row_iter = tqdm(
+                ds,
+                desc="fineweb",
+                unit="doc",
+                mininterval=1.0,
+                dynamic_ncols=True,
+            )
+
+        for row in row_iter:
             text: str = row.get(self.TEXT_FIELD, "") or ""
 
             if len(text) < self.min_doc_len:
@@ -102,19 +118,22 @@ class FineWebEduStream:
             chars_seen += len(text)
             docs_seen  += 1
 
-            if self.log_every and docs_seen % self.log_every == 0:
+            if self.progress and self.log_every and docs_seen % self.log_every == 0:
                 elapsed = time.time() - t0
                 rate    = chars_seen / elapsed / 1e6  # MB/s
                 pct     = 100 * chars_seen / self.token_budget
-                print(
-                    f"  [fineweb] {docs_seen:>8,} docs  "
-                    f"{chars_seen / 1e9:.3f}B chars  "
-                    f"({pct:.1f}%)  "
-                    f"{rate:.1f} MB/s"
-                )
+                if isinstance(row_iter, tqdm):
+                    row_iter.set_postfix(
+                        chars=f"{chars_seen / 1e9:.3f}B",
+                        pct=f"{pct:.1f}%",
+                        mb_s=f"{rate:.1f}",
+                    )
 
             if chars_seen >= self.token_budget:
                 break
+
+        if self.progress and isinstance(row_iter, tqdm):
+            row_iter.close()
 
         elapsed = time.time() - t0
         print(

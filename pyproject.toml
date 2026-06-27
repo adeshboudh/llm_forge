@@ -11,6 +11,7 @@ authors = [
 dependencies = [
     "numpy>=2.0",
     "datasets>=3.0",
+    "tqdm>=4.66",
 ]
 
 [project.optional-dependencies]

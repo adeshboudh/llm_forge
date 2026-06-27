@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from tqdm import tqdm
 
 
 class ShardedTokenDataset:
@@ -46,6 +47,7 @@ class ShardedTokenDataset:
         stride:         Step between windows (default = seq_len, no overlap).
                         stride < seq_len → overlapping windows (more data,
                         but correlated — not recommended for pretraining).
+        progress:       Show tqdm bar over sequences (default True).
     """
 
     def __init__(
@@ -54,11 +56,13 @@ class ShardedTokenDataset:
         seq_len:        int = 1024,
         shuffle_shards: bool = True,
         stride:         int | None = None,
+        progress:       bool = True,
     ) -> None:
         self.shard_dir      = Path(shard_dir)
         self.seq_len        = seq_len
         self.shuffle_shards = shuffle_shards
         self.stride         = stride if stride is not None else seq_len
+        self.progress       = progress
 
         self._shards, self._metadata = self._load_metadata()
         self._total_sequences = self._estimate_total_sequences()
@@ -73,6 +77,17 @@ class ShardedTokenDataset:
         if self.shuffle_shards:
             random.shuffle(shard_paths)
 
+        # Outer bar over total sequences — set total if known
+        outer = None
+        if self.progress and self._total_sequences > 0:
+            outer = tqdm(
+                total=self._total_sequences,
+                desc="dataset",
+                unit="seq",
+                mininterval=1.0,
+                dynamic_ncols=True,
+            )
+
         for shard_path in shard_paths:
             tokens = np.load(shard_path).astype(np.int64)  # uint16 → int64 for loss
 
@@ -81,6 +96,11 @@ class ShardedTokenDataset:
             for start in range(0, len(tokens) - window + 1, self.stride):
                 chunk = tokens[start : start + window]
                 yield chunk[:-1], chunk[1:]  # input, target
+                if outer is not None:
+                    outer.update(1)
+
+        if outer is not None:
+            outer.close()
 
     def __len__(self) -> int:
         """Approximate total sequences across all shards."""
