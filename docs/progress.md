@@ -11,18 +11,18 @@ Updated manually after each significant milestone.
 
 ### What's done
 
-| Artifact | Location | Notes |
-|----------|----------|-------|
-| Python BPE trainer | `tokenizer/trainers/bpe.py` | Reference implementation, educational |
-| Rust BPE trainer | `tokenizer/trainers/bpe_rust/` | ~50× faster, parallel via rayon |
-| Corpus downloader | `tokenizer/trainers/download_corpus.py` | Streams FineWeb-Edu → stdout |
-| Encoder | `tokenizer/runtime/encode.py` | GPT-2 pretokenization, greedy merge |
-| Decoder | `tokenizer/runtime/decode.py` | byte-level, skip_special_tokens |
-| Serialization | `tokenizer/serialization/save.py` + `load.py` | tokenizer.json canonical format |
-| Training script | `tokenizer/train_tokenizer.py` | Python trainer CLI (slow, use Rust) |
-| Tests | `tokenizer/tests/test_bpe.py` | 68 tests, all pass |
-| **Trained tokenizer** | `tokenizer/saved/tokenizer.json` | **32k vocab, 1B chars FineWeb-Edu** |
-| Config | `configs/tokenizer/bpe_32k.yaml` | Reference YAML, no code wiring |
+| Artifact              | Location                                      | Notes                                 |
+| --------------------- | --------------------------------------------- | ------------------------------------- |
+| Python BPE trainer    | `tokenizer/trainers/bpe.py`                   | Reference implementation, educational |
+| Rust BPE trainer      | `tokenizer/trainers/bpe_rust/`                | ~50× faster, parallel via rayon       |
+| Corpus downloader     | `tokenizer/trainers/download_corpus.py`       | Streams FineWeb-Edu → stdout          |
+| Encoder               | `tokenizer/runtime/encode.py`                 | GPT-2 pretokenization, greedy merge   |
+| Decoder               | `tokenizer/runtime/decode.py`                 | byte-level, skip_special_tokens       |
+| Serialization         | `tokenizer/serialization/save.py` + `load.py` | tokenizer.json canonical format       |
+| Training script       | `tokenizer/train_tokenizer.py`                | Python trainer CLI (slow, use Rust)   |
+| Tests                 | `tokenizer/tests/test_bpe.py`                 | 68 tests, all pass                    |
+| **Trained tokenizer** | `tokenizer/saved/tokenizer.json`              | **32k vocab, 1B chars FineWeb-Edu**   |
+| Config                | `configs/tokenizer/bpe_32k.yaml`              | Reference YAML, no code wiring        |
 
 ### Training run details
 
@@ -53,23 +53,29 @@ Updated manually after each significant milestone.
 
 ### What's done
 
-| Artifact | Location | Notes |
-|----------|----------|-------|
-| FineWeb-Edu source | `data/sources/fineweb.py` | Streaming, char-budget stop |
-| Document tokenizer | `data/preprocessing/tokenize_dataset.py` | Prepends EOT (ID=0) per doc |
-| Shard writer | `data/preprocessing/shard_writer.py` | uint16 .npy, 50M tokens/shard |
-| Data loader | `data/loaders/npy_loader.py` | Lazy shard load, (input, target) pairs |
-| Pipeline CLI | `data/pipeline.py` | Wires all components, token-budget stop |
-| Tests | `data/tests/test_pipeline.py` | 23 tests, all pass |
-| Dataset config | `configs/datasets/fineweb_edu.yaml` | Token budgets per model size |
+| Artifact           | Location                                 | Notes                                   |
+| ------------------ | ---------------------------------------- | --------------------------------------- |
+| FineWeb-Edu source | `data/sources/fineweb.py`                | Streaming, char-budget stop             |
+| Document tokenizer | `data/preprocessing/tokenize_dataset.py` | Prepends EOT (ID=0) per doc             |
+| Shard writer       | `data/preprocessing/shard_writer.py`     | uint16 .npy, 50M tokens/shard           |
+| Data loader        | `data/loaders/npy_loader.py`             | Lazy shard load, (input, target) pairs  |
+| Pipeline CLI       | `data/pipeline.py`                       | Wires all components, token-budget stop |
+| Tests              | `data/tests/test_pipeline.py`            | 23 tests, all pass                      |
+| Dataset config     | `configs/datasets/fineweb_edu.yaml`      | Token budgets per model size            |
 
 ### Shard plan
 
-| Version | Token budget | For model | Status |
-|---------|-------------|-----------|--------|
-| `v1-bpe32k-fineweb1B` | 1B tokens | 25M params | ⏳ Not generated |
-| `v1-bpe32k-fineweb5B` | 5B tokens | 125M params | ⏳ Not generated |
-| `v1-bpe32k-fineweb10BT` | 10B tokens | 350M params | ⏳ Not generated |
+**One canonical 10B-token shard set.** Smaller training runs consume a prefix of it.
+
+| Version                 | Token budget | For model   | Source                          |
+| ----------------------- | ------------ | ----------- | ------------------------------- |
+| `v1-bpe32k-fineweb10BT` | 10B tokens   | 350M params | full shard set                  |
+| 25M training            | first 1B     | 25M params  | first ~20 shards of 10B set     |
+| 125M training           | first 5B     | 125M params | first ~100 shards of 10B set    |
+
+**Why one set:** shards are flat uint16 token streams in deterministic stream order. The loader slices by `seq_len`/`total_tokens` at training time. Running 3 separate shard jobs = 3× disk, 3× upload, 3× version churn for no benefit. Subset = prefix of the same file set.
+
+**Status:** ⏳ Not generated (single 10B run, then subset at training time).
 
 ### To generate shards
 
@@ -125,23 +131,23 @@ Then upload `data/shards/` to Kaggle Dataset `llm-forge-tokens-v1`.
 
 ## Decisions Log (cross-cutting)
 
-| Decision | Rationale |
-|----------|-----------|
-| FineWeb-Edu as pretraining data | High-quality educational text, good for small models |
-| 25M → 125M → 350M model sizes | Iterable scale on Kaggle TPU v5e-8 (128GB HBM) |
-| uint16 .npy shards | 50% smaller than int32, all token IDs fit (0–32767) |
-| kv_cache split: model/ vs inference/ | Data structure vs serving management — clean boundary |
-| Special tokens locked at 0–4 | Changing them invalidates all .npy shards |
-| Dataset versioning: never overwrite | Reproducibility — v1, v2, etc. by tokenizer version |
-| Flat token stream, no padding | seq_len decided at training time, not dataset creation |
-| Kaggle Dataset for shards, git for code | Shards too large for git; tokenizer small enough (2MB) |
-| Rust BPE trainer alongside Python | Python = learning reference; Rust = actual training tool |
+| Decision                                | Rationale                                                |
+| --------------------------------------- | -------------------------------------------------------- |
+| FineWeb-Edu as pretraining data         | High-quality educational text, good for small models     |
+| 25M → 125M → 350M model sizes           | Iterable scale on Kaggle TPU v5e-8 (128GB HBM)           |
+| uint16 .npy shards                      | 50% smaller than int32, all token IDs fit (0–32767)      |
+| kv_cache split: model/ vs inference/    | Data structure vs serving management — clean boundary    |
+| Special tokens locked at 0–4            | Changing them invalidates all .npy shards                |
+| Dataset versioning: never overwrite     | Reproducibility — v1, v2, etc. by tokenizer version      |
+| Flat token stream, no padding           | seq_len decided at training time, not dataset creation   |
+| Kaggle Dataset for shards, git for code | Shards too large for git; tokenizer small enough (2MB)   |
+| Rust BPE trainer alongside Python       | Python = learning reference; Rust = actual training tool |
 
 ---
 
 ## Kaggle Artifacts Plan
 
-| Kaggle Dataset | Contents | Status |
-|----------------|----------|--------|
-| `llm-forge-tokenizer-v1` | `tokenizer.json`, `vocab.json`, `merges.txt` | ⏳ Not uploaded |
-| `llm-forge-tokens-v1` | `shard_*.npy` + `metadata.json` (10B tokens) | ⏳ Not generated |
+| Kaggle Dataset           | Contents                                     | Status           |
+| ------------------------ | -------------------------------------------- | ---------------- |
+| `llm-forge-tokenizer-v1` | `tokenizer.json`, `vocab.json`, `merges.txt` | ⏳ Not uploaded  |
+| `llm-forge-tokens-v1`    | `shard_*.npy` + `metadata.json` (10B tokens) | ⏳ Not generated |

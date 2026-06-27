@@ -1,0 +1,110 @@
+# llm_forge — phase build commands
+# Phase 1: tokenizer (BPE 32k)
+# Phase 2: data pipeline (FineWeb-Edu → uint16 shards)
+# Phase 3+: not yet wired
+
+PY       := .venv/bin/python
+PYTEST   := .venv/bin/pytest
+RUFF     := .venv/bin/ruff
+PIP      := .venv/bin/pip
+
+# ----- shared -----
+.PHONY: help install lint format clean
+
+help:
+	@echo "llm_forge Makefile"
+	@echo ""
+	@echo "Setup:"
+	@echo "  make install     install dev deps (editable)"
+	@echo "  make lint        ruff check"
+	@echo "  make format      ruff format"
+	@echo "  make clean       remove caches + artifacts"
+	@echo ""
+	@echo "Phase 1 — Tokenizer:"
+	@echo "  make tok-train           train BPE 32k on FineWeb-Edu (1B chars, ~1hr)"
+	@echo "  make tok-train-fast      download corpus + run Rust BPE trainer"
+	@echo "  make tok-test            run tokenizer unit tests"
+	@echo "  make tok-encode TEXT=... round-trip encode/decode check"
+	@echo "  make tok-download-corpus  stream FineWeb-Edu to stdout (1B chars)"
+	@echo ""
+	@echo "Phase 2 — Data Pipeline:"
+	@echo "  make data-test           run pipeline unit tests"
+	@echo "  make data-smoke          tiny end-to-end shard run (1k tokens)"
+	@echo "  make data-shards-10b     build 10B-token shards (canonical set; subsets used for 1B/5B training)"
+
+install:
+	$(PIP) install -e ".[dev]"
+
+lint:
+	$(RUFF) check .
+
+format:
+	$(RUFF) format .
+
+clean:
+	rm -rf .pytest_cache .ruff_cache **/__pycache__ data/shards data/shards_1b data/shards_smoke
+
+# =============================================================================
+# Phase 1 — Tokenizer (BPE 32k)
+# =============================================================================
+.PHONY: tok-test tok-train tok-train-fast tok-encode tok-download-corpus
+
+tok-test:
+	$(PYTEST) tokenizer/tests/ -v
+
+tok-download-corpus:
+	$(PY) tokenizer/trainers/download_corpus.py --char-budget 1000000000
+
+tok-train:
+	$(PY) tokenizer/train_tokenizer.py \
+		--output-dir tokenizer/saved/ \
+		--vocab-size 32768 \
+		--char-budget 1000000000
+
+tok-train-fast:
+	$(PY) tokenizer/trainers/download_corpus.py --char-budget 1000000000 \
+		| ./tokenizer/trainers/bpe_rust/target/release/bpe-trainer \
+			--output-dir tokenizer/saved/
+
+tok-encode:
+	$(PY) -c "from tokenizer.serialization.load import load_tokenizer; \
+tok = load_tokenizer('tokenizer/saved/tokenizer.json'); \
+ids = tok.encode('$(TEXT)'); \
+print('ids:', ids); \
+print('decoded:', tok.decode(ids))"
+
+# =============================================================================
+# Phase 2 — Data Pipeline (FineWeb-Edu → uint16 .npy shards)
+# =============================================================================
+# One canonical 10B shard set. Smaller training runs (25M, 125M) consume
+# a prefix of this set via ShardedTokenDataset's token slicing.
+.PHONY: data-test data-smoke data-shards-10b
+
+data-test:
+	$(PYTEST) data/tests/ -v
+
+# Tiny end-to-end run to validate the pipeline locally (no real HF download)
+data-smoke:
+	$(PY) -c "from data.preprocessing.shard_writer import ShardWriter; \
+from data.preprocessing.tokenize_dataset import DocumentTokenizer; \
+from tokenizer.serialization.load import load_tokenizer; \
+import os, tempfile; \
+tmp = tempfile.mkdtemp(prefix='shards_smoke_'); \
+tok = load_tokenizer('tokenizer/saved/tokenizer.json'); \
+dt = DocumentTokenizer(tok, add_eot=True); \
+w = ShardWriter(output_dir=tmp, shard_size=10000, vocab_size=tok.vocab_size); \
+texts = ['hello world ' * 50, 'goodbye world ' * 30, 'lorem ipsum ' * 100]; \
+[tokens := dt.encode_document(t) or w.add(dt.encode_document(t)) for t in texts]; \
+meta = w.finalize(dataset_version='v-smoke'); \
+print('smoke OK ->', tmp, meta)"
+
+# Canonical 10B-token shard set (~4-8h on Kaggle CPU).
+# 25M model trains on first 1B (first ~20 shards).
+# 125M model trains on first 5B (first ~100 shards).
+# 350M model trains on all 10B (all ~200 shards).
+data-shards-10b:
+	$(PY) data/pipeline.py \
+		--tokenizer tokenizer/saved/tokenizer.json \
+		--output-dir data/shards/ \
+		--token-budget 10000000000 \
+		--dataset-version v1-bpe32k-fineweb10BT
