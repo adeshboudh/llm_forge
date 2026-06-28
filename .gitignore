@@ -30,3 +30,6 @@ web/out/
 
 # pytest cache
 .pytest_cache/
+
+# kaggle upload staging
+.kaggle_stage_*/

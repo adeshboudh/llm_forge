@@ -35,6 +35,8 @@ help:
 	@echo "  make data-smoke          tiny end-to-end shard run (1k tokens)"
 	@echo "  make data-shards-10b     build 10B-token shards (canonical set; subsets used for 1B/5B training)"
 	@echo "  make data-shards-resume  resume an interrupted 10B run from existing shards"
+	@echo "  make kaggle-push        upload data/shards/ as a new Kaggle dataset"
+	@echo "  make kaggle-version     upload as a new version of an existing dataset"
 
 install:
 	$(UV) sync --extra dev
@@ -85,7 +87,7 @@ print('decoded:', tok.decode(ids))"
 # =============================================================================
 # One canonical 10B shard set. Smaller training runs (25M, 125M) consume
 # a prefix of this set via ShardedTokenDataset's token slicing.
-.PHONY: data-test data-smoke data-shards-10b data-shards-resume
+.PHONY: data-test data-smoke data-shards-10b data-shards-resume kaggle-push kaggle-version
 
 data-test:
 	$(PYTEST) data/tests/ -v
@@ -125,3 +127,12 @@ data-shards-resume:
 		--token-budget 10000000000 \
 		--dataset-version v1-bpe32k-fineweb10BT \
 		--skip-existing
+
+# Push data/shards/ to Kaggle as a new dataset.
+# Requires KAGGLE_USERNAME + KAGGLE_KEY (or ~/.kaggle/kaggle.json).
+kaggle-push:
+	bash scripts/push_shards_to_kaggle.sh create
+
+# Push a new version of an existing Kaggle dataset.
+kaggle-version:
+	bash scripts/push_shards_to_kaggle.sh version
