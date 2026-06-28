@@ -31,5 +31,11 @@ web/out/
 # pytest cache
 .pytest_cache/
 
+# data shards (regenerated, not committed)
+data/shards/
+
 # kaggle upload staging
 .kaggle_stage_*/
+
+# environment secrets
+.env
