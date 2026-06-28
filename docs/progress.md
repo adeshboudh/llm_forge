@@ -47,61 +47,62 @@ Updated manually after each significant milestone.
 
 ---
 
-## Phase 2 — Data Pipeline ✅ Code complete / ⏳ Shards not yet generated
+## Phase 2 — Data Pipeline ✅ COMPLETE (with overshoot — see note)
 
-**Status:** All pipeline code written and tested. Shards need to be generated on target machine.
+**Status:** All code written, tested, shards generated and pushed to Kaggle.
+First run overshot the 10B budget by 7.5% (mid-shard flush race). Hard-cap fix landed afterward; future runs land at exactly the budget.
 
 ### What's done
 
 | Artifact           | Location                                 | Notes                                   |
 | ------------------ | ---------------------------------------- | --------------------------------------- |
-| FineWeb-Edu source | `data/sources/fineweb.py`                | Streaming, char-budget stop             |
-| Document tokenizer | `data/preprocessing/tokenize_dataset.py` | Prepends EOT (ID=0) per doc             |
-| Shard writer       | `data/preprocessing/shard_writer.py`     | uint16 .npy, 50M tokens/shard           |
-| Data loader        | `data/loaders/npy_loader.py`             | Lazy shard load, (input, target) pairs  |
-| Pipeline CLI       | `data/pipeline.py`                       | Wires all components, token-budget stop |
+| FineWeb-Edu source | `data/sources/fineweb.py`                | Streaming, char-budget stop, tqdm bar   |
+| Document tokenizer | `data/preprocessing/tokenize_dataset.py` | Prepends EOT (ID=0), tqdm bar           |
+| Shard writer       | `data/preprocessing/shard_writer.py`     | uint16 .npy, 50M tokens/shard, tqdm bar |
+| Data loader        | `data/loaders/npy_loader.py`             | Lazy shard load, (input, target) pairs |
+| Pipeline CLI       | `data/pipeline.py`                       | Hard-cap, resume support, tqdm bars     |
 | Tests              | `data/tests/test_pipeline.py`            | 23 tests, all pass                      |
 | Dataset config     | `configs/datasets/fineweb_edu.yaml`      | Token budgets per model size            |
+| Push script        | `scripts/push_shards_to_kaggle.sh`       | kaggle CLI wrapper, tar mode            |
 
 ### Shard plan
 
 **One canonical 10B-token shard set.** Smaller training runs consume a prefix of it.
 
-| Version                 | Token budget | For model   | Source                          |
-| ----------------------- | ------------ | ----------- | ------------------------------- |
-| `v1-bpe32k-fineweb10BT` | 10B tokens   | 350M params | full shard set                  |
-| 25M training            | first 1B     | 25M params  | first ~20 shards of 10B set     |
-| 125M training           | first 5B     | 125M params | first ~100 shards of 10B set    |
+| Version                       | Tokens      | Shards | For model   | Source                          |
+| ----------------------------- | ----------- | ------ | ----------- | ------------------------------- |
+| `v1-bpe32k-fineweb10B-overshoot` | 10,750,000,000 | 215    | 350M params | full uploaded set (7.5% over)  |
+| 25M training                  | first 1B    | 20     | 25M params  | first ~20 shards                |
+| 125M training                 | first 5B    | 100    | 125M params | first ~100 shards               |
 
 **Why one set:** shards are flat uint16 token streams in deterministic stream order. The loader slices by `seq_len`/`total_tokens` at training time. Running 3 separate shard jobs = 3× disk, 3× upload, 3× version churn for no benefit. Subset = prefix of the same file set.
 
-**Status:** ⏳ Not generated (single 10B run, then subset at training time).
+### Generated shard set — `llm-forge-tokens-v1-overshoot`
 
-### To generate shards
+- **Tokens:** 10,750,000,000 (215 shards × 50M; 7.5% over the 10B target)
+- **Disk:** ~21.5 GB
+- **Format:** uint16 `.npy`, 50M tokens/shard, `metadata.json` with full shard index
+- **Pushed to:** Kaggle Dataset `llm-forge-tokens-v1-overshoot`
+- **Mount path on Kaggle:** `/kaggle/input/llm-forge-tokens-v1-overshoot/`
+- **Why overshoot:** initial pipeline flushed a full shard after `total_tokens` already passed the budget. Fixed by hard-cap in `pipeline.py` — last doc is now truncated to fit.
+- **Acceptable for training:** yes. 25M/125M subsets unaffected. 350M will use first 200 shards (10B) — last 15 shards are dead weight, can be ignored at training time.
 
-```bash
-# On target machine (Kaggle / Lightning AI — needs network + time)
-python data/pipeline.py \
-    --tokenizer tokenizer/saved/tokenizer.json \
-    --output-dir data/shards/ \
-    --token-budget 10_000_000_000 \
-    --dataset-version v1-bpe32k-fineweb10BT
-```
+### Future shard sets
 
-Then upload `data/shards/` to Kaggle Dataset `llm-forge-tokens-v1`.
+- `v2-bpe32k-fineweb10BT` (planned) — clean 10B / 200 shards using the hard-cap fix
+- Triggered only if v1-overshoot causes issues (e.g. reproducibility complaints). Otherwise keep v1.
 
 ### Decisions made
 
 - **Flat uint16 .npy** (not padded sequences) — seq_len controlled at training time, more flexible
 - **50M tokens/shard = ~100MB/file** — Kaggle-friendly chunk size
-- **FileExistsError guard** in ShardWriter — prevents accidental shard overwrite
+- **FileExistsError guard** in ShardWriter (default) — prevents accidental shard overwrite
+- **`--skip-existing` resume** — opt-in flag, picks up from `shard_{N:05d}.npy` after partial run
 - **EOT prepend per doc** — document boundary marked by `<|endoftext|>` (ID=0)
 - **Token budget** measured in output tokens (not chars) — pipeline counts post-BPE tokens
-
-### Open questions / blockers
-
-- **Shard generation not started yet** — needs ~4–8 CPU hours on network-connected machine
-- **Kaggle upload** — manual step after shard generation
+- **Hard-cap on budget** — last doc truncated to never overshoot, final shard may be partial
+- **tqdm progress bars** — every multi-hour loop (`FineWebEduStream`, `DocumentTokenizer`, `ShardWriter`, `ShardedTokenDataset`) shows live throughput + ETA
+- **kaggle push via CLI** — `scripts/push_shards_to_kaggle.sh` (hard-links shards, tar mode upload)
 
 ---
 
@@ -121,7 +122,7 @@ Then upload `data/shards/` to Kaggle Dataset `llm-forge-tokens-v1`.
 
 ---
 
-## Phase 4 — Pretraining 🔒 BLOCKED on Phase 3
+## Phase 4 — Pretraining 🔓 Data ready, blocked on Phase 3
 
 ## Phase 5 — Post-Training 🔒 BLOCKED on Phase 4
 
@@ -145,9 +146,9 @@ Then upload `data/shards/` to Kaggle Dataset `llm-forge-tokens-v1`.
 
 ---
 
-## Kaggle Artifacts Plan
+## Kaggle Artifacts
 
-| Kaggle Dataset           | Contents                                     | Status           |
-| ------------------------ | -------------------------------------------- | ---------------- |
-| `llm-forge-tokenizer-v1` | `tokenizer.json`, `vocab.json`, `merges.txt` | ⏳ Not uploaded  |
-| `llm-forge-tokens-v1`    | `shard_*.npy` + `metadata.json` (10B tokens) | ⏳ Not generated |
+| Kaggle Dataset                       | Contents                                          | Status         |
+| ------------------------------------ | ------------------------------------------------- | -------------- |
+| `llm-forge-tokenizer-v1`             | `tokenizer.json`, `vocab.json`, `merges.txt`      | ⏳ Not uploaded |
+| `llm-forge-tokens-v1-overshoot`      | 215 × `shard_*.npy` + `metadata.json` (10.75B)    | ✅ Pushed       |
