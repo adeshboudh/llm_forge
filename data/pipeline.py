@@ -78,6 +78,12 @@ def parse_args() -> argparse.Namespace:
         default=100,
         help="Skip documents shorter than N chars (default: 100)",
     )
+    p.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Resume from existing shards in --output-dir instead of failing. "
+             "Use after a partial/interrupted run.",
+    )
     return p.parse_args()
 
 
@@ -125,6 +131,7 @@ def main() -> None:
         shard_size=args.shard_size,
         vocab_size=tok.vocab_size,
         token_budget=args.token_budget,
+        skip_existing=args.skip_existing,
     )
 
     print("\nStreaming and tokenizing...")

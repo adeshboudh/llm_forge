@@ -34,6 +34,7 @@ help:
 	@echo "  make data-test           run pipeline unit tests"
 	@echo "  make data-smoke          tiny end-to-end shard run (1k tokens)"
 	@echo "  make data-shards-10b     build 10B-token shards (canonical set; subsets used for 1B/5B training)"
+	@echo "  make data-shards-resume  resume an interrupted 10B run from existing shards"
 
 install:
 	$(UV) sync --extra dev
@@ -84,7 +85,7 @@ print('decoded:', tok.decode(ids))"
 # =============================================================================
 # One canonical 10B shard set. Smaller training runs (25M, 125M) consume
 # a prefix of this set via ShardedTokenDataset's token slicing.
-.PHONY: data-test data-smoke data-shards-10b
+.PHONY: data-test data-smoke data-shards-10b data-shards-resume
 
 data-test:
 	$(PYTEST) data/tests/ -v
@@ -114,3 +115,13 @@ data-shards-10b:
 		--output-dir data/shards/ \
 		--token-budget 10000000000 \
 		--dataset-version v1-bpe32k-fineweb10BT
+
+# Resume an interrupted run. Continues from shard_{N:05d}.npy
+# where N = count of existing shards. Re-runnable.
+data-shards-resume:
+	$(PY) data/pipeline.py \
+		--tokenizer tokenizer/saved/tokenizer.json \
+		--output-dir data/shards/ \
+		--token-budget 10000000000 \
+		--dataset-version v1-bpe32k-fineweb10BT \
+		--skip-existing

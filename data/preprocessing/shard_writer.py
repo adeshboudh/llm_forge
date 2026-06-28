@@ -56,6 +56,9 @@ class ShardWriter:
         vocab_size:  Expected vocab size for validation (default 32_768).
         progress:    Show tqdm bar over total tokens written (default True).
         token_budget: Total tokens expected (sets tqdm total). None = unknown.
+        skip_existing: If True, resume from where shards left off
+                       (default False — raise on existing to prevent
+                       accidental overwrite when tokenizer changes).
     """
 
     def __init__(
@@ -65,12 +68,14 @@ class ShardWriter:
         vocab_size:  int = 32_768,
         progress:    bool = True,
         token_budget: int | None = None,
+        skip_existing: bool = False,
     ) -> None:
         self.output_dir  = Path(output_dir)
         self.shard_size  = shard_size
         self.vocab_size  = vocab_size
         self.progress    = progress
         self.token_budget = token_budget
+        self.skip_existing = skip_existing
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -78,19 +83,34 @@ class ShardWriter:
         self._shard_index:  int = 0
         self._total_tokens: int = 0
         self._shard_records: list[dict[str, Any]] = []
+        self._resumed_from: int = 0  # how many shards were pre-existing
 
-        # Guard against overwriting existing shards
         existing = sorted(self.output_dir.glob("shard_*.npy"))
         if existing:
-            raise FileExistsError(
-                f"Shards already exist in {self.output_dir}. "
-                f"Increment dataset version — never overwrite shards.\n"
-                f"First existing: {existing[0].name}"
+            if not skip_existing:
+                raise FileExistsError(
+                    f"Shards already exist in {self.output_dir}. "
+                    f"Increment dataset version — never overwrite shards.\n"
+                    f"First existing: {existing[0].name}\n"
+                    f"Pass skip_existing=True to resume from "
+                    f"shard_{len(existing):05d}.npy."
+                )
+            # Resume mode: count existing, continue indexing from next index
+            self._resumed_from = len(existing)
+            self._shard_index  = len(existing)
+            existing_tokens = self._sum_existing_tokens(existing)
+            self._total_tokens = existing_tokens
+            print(
+                f"  [shard_writer] resuming: "
+                f"{len(existing)} existing shards, "
+                f"{existing_tokens:,} tokens on disk. "
+                f"Next index: {self._shard_index:05d}"
             )
 
-        # Progress bar — updates via update() per token, closes on finalize()
+        # Progress bar — start from resumed offset if any
         self._bar: tqdm | None = None
         if self.progress:
+            bar_initial = self._total_tokens
             self._bar = tqdm(
                 total=token_budget,
                 desc="shards",
@@ -98,6 +118,7 @@ class ShardWriter:
                 mininterval=1.0,
                 dynamic_ncols=True,
                 file=sys.stderr,
+                initial=bar_initial,
             )
 
     # ------------------------------------------------------------------
@@ -167,6 +188,11 @@ class ShardWriter:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _sum_existing_tokens(paths: list[Path]) -> int:
+        """Sum token counts from existing shard .npy files."""
+        return sum(np.load(p, mmap_mode="r").shape[0] for p in paths)
 
     def _flush(self, tokens: list[int]) -> None:
         """Write one shard to disk as uint16 .npy."""
