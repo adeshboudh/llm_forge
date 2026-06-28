@@ -37,5 +37,8 @@ data/shards/
 # kaggle upload staging
 .kaggle_stage_*/
 
+# brainstorming visual companion
+.superpowers/
+
 # environment secrets
 .env
