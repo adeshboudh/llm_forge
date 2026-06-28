@@ -137,8 +137,20 @@ def main() -> None:
     print("\nStreaming and tokenizing...")
     t0           = time.time()
     total_tokens = 0
+    truncated    = False
 
     for token_ids in doc_tok.encode_stream(source):
+        remaining = args.token_budget - total_tokens
+        if remaining <= 0:
+            break
+
+        # Hard-cap: never write tokens past the budget. If the next doc
+        # would overshoot, truncate it to fit (still emitted as one
+        # token list, just shorter). The final shard may be partial.
+        if len(token_ids) > remaining:
+            token_ids = token_ids[:remaining]
+            truncated = True
+
         writer.add(token_ids)
         total_tokens += len(token_ids)
 
@@ -151,6 +163,8 @@ def main() -> None:
     print(f"\nPipeline complete in {elapsed/3600:.2f} hours")
     print(f"  total_tokens : {metadata['total_tokens']:,}")
     print(f"  total_shards : {metadata['total_shards']}")
+    if truncated:
+        print(f"  last doc truncated to fit {args.token_budget:,} budget")
     print(f"\nUpload '{args.output_dir}' to Kaggle Dataset '{args.dataset_version}'")
 
 
