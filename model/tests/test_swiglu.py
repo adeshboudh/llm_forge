@@ -59,11 +59,11 @@ def test_gradients_flow():
 
 
 def test_d_ff_config_match():
-    for name, expected in [("model_25m", 1280), ("model_125m", 2560), ("model_350m", 2816)]:
+    for name, expected in [("model_25m", 1280), ("model_125m", 3072), ("model_350m", 2816)]:
         cfg = load_model_config(name)
         assert cfg.d_ff == expected, f"{name}: yaml"
     # model_25m and model_350m d_ff match the standard formula;
-    # model_125m is tuned upward (2560 vs formula 2048) to land closer to 125M.
+    # model_125m is tuned upward (3072 vs formula 2048) to land at 125M.
     for name in ("model_25m", "model_350m"):
         cfg = load_model_config(name)
         assert cfg.d_ff == compute_d_ff(cfg.d_model), f"{name}: formula mismatch"

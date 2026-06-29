@@ -30,7 +30,7 @@ def test_load_model_125m():
     assert cfg.d_model == 768
     assert cfg.n_heads == 12
     assert cfg.n_kv_heads == 4
-    assert cfg.d_ff == 2560
+    assert cfg.d_ff == 3072
     assert cfg.max_seq_len == 1024
 
 
