@@ -1,0 +1,17 @@
+name: model_350m
+target_params: 350_000_000
+architecture: llama
+n_layers: 24
+d_model: 1024
+n_heads: 16
+n_kv_heads: 8
+d_ff: 2816
+vocab_size: 32768
+max_seq_len: 2048
+theta_base: 10000.0
+tied_embeddings: true
+attention: gqa
+init:
+  embed_std: 0.02
+  hidden_std: 0.02
+  norm_scale: 1.0

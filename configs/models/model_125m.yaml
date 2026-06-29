@@ -1,0 +1,17 @@
+name: model_125m
+target_params: 125_000_000
+architecture: llama
+n_layers: 12
+d_model: 768
+n_heads: 12
+n_kv_heads: 4
+d_ff: 3072
+vocab_size: 32768
+max_seq_len: 1024
+theta_base: 10000.0
+tied_embeddings: true
+attention: gqa
+init:
+  embed_std: 0.02
+  hidden_std: 0.02
+  norm_scale: 1.0
