@@ -12,7 +12,7 @@ PYTEST   := $(UV) run pytest
 RUFF     := $(UV) run ruff
 
 # ----- shared -----
-.PHONY: help sync install lint format clean
+.PHONY: help sync install lint format clean model-test model-summary model-summary-25m model-summary-125m model-summary-350m
 
 help:
 	@echo "llm_forge Makefile"
@@ -37,6 +37,10 @@ help:
 	@echo "  make data-shards-resume  resume an interrupted 10B run from existing shards"
 	@echo "  make kaggle-push        upload data/shards/ as a new Kaggle dataset"
 	@echo "  make kaggle-version     upload as a new version of an existing dataset"
+	@echo ""
+	@echo "Phase 3 — Model:"
+	@echo "  make model-test      run model unit tests"
+	@echo "  make model-summary   print param count for --name=NAME"
 
 install:
 	$(UV) sync --extra dev
@@ -136,3 +140,24 @@ kaggle-push:
 # Push a new version of an existing Kaggle dataset.
 kaggle-version:
 	bash scripts/push_shards_to_kaggle.sh version
+
+# =============================================================================
+# Phase 3 — Model Architecture (JAX/Flax Llama-style)
+# =============================================================================
+.PHONY: model-test model-summary model-summary-25m model-summary-125m model-summary-350m
+
+model-test:
+	$(PYTEST) model/tests/ -v
+
+model-summary:
+	@test -n "$(NAME)" || (echo "Usage: make model-summary NAME=model_25m" && exit 1)
+	$(PY) -m model.summary --name $(NAME)
+
+model-summary-25m:
+	$(PY) -m model.summary --name model_25m
+
+model-summary-125m:
+	$(PY) -m model.summary --name model_125m
+
+model-summary-350m:
+	$(PY) -m model.summary --name model_350m
