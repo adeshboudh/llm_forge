@@ -27,7 +27,7 @@ class SwiGLUMLP(nn.Module):
 
     Args:
         d_model: Input/output feature dim.
-        d_ff:    Intermediate dim. If None, computed from d_model.
+        d_ff:    Intermediate dim.
     """
     d_model: int
     d_ff: int

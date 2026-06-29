@@ -5,6 +5,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from model.config import load_model_config
 from model.mlp.swiglu import SwiGLUMLP, compute_d_ff
 
 
@@ -57,7 +58,8 @@ def test_gradients_flow():
 
 
 def test_d_ff_config_match():
-    # The ModelConfig values should match compute_d_ff
-    assert compute_d_ff(512) == 1280
-    assert compute_d_ff(768) == 2048
-    assert compute_d_ff(1024) == 2816
+    for name, expected in [("model_25m", 1280), ("model_125m", 2048), ("model_350m", 2816)]:
+        cfg = load_model_config(name)
+        assert compute_d_ff(cfg.d_model) == expected, f"{name}: formula"
+        assert cfg.d_ff == expected, f"{name}: yaml"
+        assert cfg.d_ff == compute_d_ff(cfg.d_model), f"{name}: mismatch"
