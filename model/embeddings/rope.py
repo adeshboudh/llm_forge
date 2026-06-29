@@ -13,20 +13,18 @@ Convention (GPT-NeoX / Llama style):
 """
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 
 
-def _build_cos_sin(
-    seq_len: int,
-    d_head: int,
-    theta_base: float = 10000.0,
-    dtype: jnp.dtype = jnp.float32,
+def _cos_sin(
+    positions: jnp.ndarray,
+    D_h: int,
+    theta_base: float,
+    dtype: jnp.dtype,
+    sign: float = 1.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Pre-compute (cos, sin) tables of shape (T, D_h/2)."""
-    inv_freq = 1.0 / (theta_base ** (jnp.arange(0, d_head, 2, dtype=jnp.float32) / d_head))
-    positions = jnp.arange(seq_len, dtype=jnp.float32)
-    angles = jnp.outer(positions, inv_freq)              # (T, D_h/2)
+    inv_freq = 1.0 / (theta_base ** (jnp.arange(0, D_h, 2, dtype=jnp.float32) / D_h))
+    angles = sign * jnp.outer(positions.astype(jnp.float32), inv_freq)
     return jnp.cos(angles).astype(dtype), jnp.sin(angles).astype(dtype)
 
 
@@ -64,10 +62,7 @@ def apply_rope(
     B, T, H, D_h = q.shape
     if positions is None:
         positions = jnp.arange(T, dtype=jnp.float32)
-    inv_freq = 1.0 / (theta_base ** (jnp.arange(0, D_h, 2, dtype=jnp.float32) / D_h))
-    angles = jnp.outer(positions.astype(jnp.float32), inv_freq)   # (T, D_h/2)
-    cos = jnp.cos(angles).astype(q.dtype)
-    sin = jnp.sin(angles).astype(q.dtype)
+    cos, sin = _cos_sin(positions, D_h, theta_base, q.dtype, sign=1.0)
     return _rotate(q, cos, sin), _rotate(k, cos, sin)
 
 
@@ -77,12 +72,9 @@ def invert_rope(
     theta_base: float = 10000.0,
     positions: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Inverse of apply_rope — rotates by -angle. Used for tests."""
+    """Inverse of apply_rope (rotation by -angle). Useful for roundtrip checks and undoing a rotation."""
     B, T, H, D_h = q.shape
     if positions is None:
         positions = jnp.arange(T, dtype=jnp.float32)
-    inv_freq = 1.0 / (theta_base ** (jnp.arange(0, D_h, 2, dtype=jnp.float32) / D_h))
-    angles = jnp.outer(positions.astype(jnp.float32), inv_freq)
-    cos = jnp.cos(-angles).astype(q.dtype)
-    sin = jnp.sin(-angles).astype(q.dtype)
+    cos, sin = _cos_sin(positions, D_h, theta_base, q.dtype, sign=-1.0)
     return _rotate(q, cos, sin), _rotate(k, cos, sin)

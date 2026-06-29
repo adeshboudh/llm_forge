@@ -30,8 +30,7 @@ def test_rotation_angle_matches():
     q = jnp.array([[[[1.0, 0.0, 0.0, 0.0]]]])  # (1,1,1,4)
     k = jnp.zeros_like(q)
     q2, _ = apply_rope(q, k, theta_base=theta_base, positions=jnp.array([t]))
-    # first pair: (cos*1 - sin*0, sin*1 + cos*0) = (cos, sin) but using a cos/sin
-    # need to reference implementation for exact convention — check our actual formula
+    # first pair: (cos*1 - sin*0, sin*1 + cos*0) = (cos, sin)
     cos_t = jnp.cos(expected_angle)
     sin_t = jnp.sin(expected_angle)
     np.testing.assert_allclose(q2[0, 0, 0, 0], cos_t, atol=1e-5)
@@ -60,15 +59,10 @@ def test_bijection():
     np.testing.assert_allclose(k_inv, k, atol=1e-4)
 
 
-def test_v_not_rotated_external():
-    # RoPE function only touches q,k — V flows around it. Test by contract:
-    # the function signature accepts (q, k) only.
+def test_signature_accepts_only_q_k():
+    # V is the caller's responsibility — RoPE is intentionally not aware of it.
     B, T, H, D_h = 1, 4, 2, 8
     key = jax.random.PRNGKey(3)
     q = jax.random.normal(key, (B, T, H, D_h))
     k = jax.random.normal(key, (B, T, H, D_h))
-    v = jax.random.normal(key, (B, T, H, D_h))
-    q2, k2 = apply_rope(q, k)
-    # v passes through unchanged — by absence from the function's outputs
-    assert v is not None  # caller's responsibility; we only rotate q,k
-    assert q2.shape == v.shape
+    apply_rope(q, k)
