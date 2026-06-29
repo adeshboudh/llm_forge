@@ -1,4 +1,5 @@
 """CausalMHA tests."""
+
 from __future__ import annotations
 
 import jax
@@ -9,8 +10,7 @@ from model.attention.variants.mha import CausalMHA
 
 
 def _init(d_model=64, n_heads=8):
-    mod = CausalMHA(d_model=d_model, n_heads=n_heads, n_kv_heads=n_heads,
-                    theta_base=10000.0)
+    mod = CausalMHA(d_model=d_model, n_heads=n_heads, n_kv_heads=n_heads, theta_base=10000.0)
     return mod, jax.random.PRNGKey(0)
 
 

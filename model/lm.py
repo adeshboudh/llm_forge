@@ -1,11 +1,12 @@
 """Full causal LM — Llama-style with tied embeddings.
 
-    x      = tok_emb[input_ids]
-    for block in blocks: x = block(x)
-    x      = final_norm(x)
-    logits = x @ tok_emb.T          # tied lm_head
-    loss   = mean(cross_entropy(logits, target_ids))
+x      = tok_emb[input_ids]
+for block in blocks: x = block(x)
+x      = final_norm(x)
+logits = x @ tok_emb.T          # tied lm_head
+loss   = mean(cross_entropy(logits, target_ids))
 """
+
 from __future__ import annotations
 
 import flax.linen as nn
@@ -23,6 +24,7 @@ class LM(nn.Module):
     Attributes:
         config: ModelConfig — sized presets from configs/models/{name}.yaml.
     """
+
     config: ModelConfig
 
     def setup(self) -> None:
@@ -52,11 +54,11 @@ class LM(nn.Module):
         Returns:
             loss (scalar) or (loss, logits) if return_logits=True.
         """
-        x = self.tok_emb[input_ids]                    # (B, T, D)
+        x = self.tok_emb[input_ids]  # (B, T, D)
         for block in self.blocks:
             x = block(x)
         x = self.final_norm(x)
-        logits = x @ self.tok_emb.T                   # tied (B, T, V)
+        logits = x @ self.tok_emb.T  # tied (B, T, V)
 
         log_probs = jax.nn.log_softmax(logits, axis=-1)
         log_p = jnp.take_along_axis(

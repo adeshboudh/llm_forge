@@ -3,6 +3,7 @@
 Usage:
     uv run python -m model.summary --name model_25m
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +19,7 @@ def main() -> None:
         sys.path.insert(0, str(repo_root))
 
     p = argparse.ArgumentParser(description="Print model param count + breakdown")
-    p.add_argument("--name", type=str, required=True,
-                   help="Config name e.g. model_25m")
+    p.add_argument("--name", type=str, required=True, help="Config name e.g. model_25m")
     args = p.parse_args()
 
     from model.config import load_model_config
@@ -51,8 +51,8 @@ def main() -> None:
     # Per-leaf breakdown
     flat = jax.tree_util.tree_flatten(params)[0]
     total = sum(leaf.size for leaf in flat)
-    print(f"\n  total params : {total:,} ({total/1e6:.2f}M)")
-    print(f"  target       : {cfg.target_params:,} ({cfg.target_params/1e6:.0f}M)")
+    print(f"\n  total params : {total:,} ({total / 1e6:.2f}M)")
+    print(f"  target       : {cfg.target_params:,} ({cfg.target_params / 1e6:.0f}M)")
     diff_pct = 100 * abs(total - cfg.target_params) / cfg.target_params
     print(f"  diff         : {diff_pct:.1f}% {'(PASS)' if diff_pct < 5 else '(OVER 5%)'}")
 
@@ -62,7 +62,7 @@ def main() -> None:
         for k, v in params["params"].items():
             if isinstance(v, dict):
                 size = sum(leaf.size for leaf in jax.tree_util.tree_leaves(v))
-                print(f"    {k:<15}: {size:,} ({size/1e6:.2f}M)")
+                print(f"    {k:<15}: {size:,} ({size / 1e6:.2f}M)")
             else:
                 print(f"    {k:<15}: {v.size:,}")
     print("=" * 60)

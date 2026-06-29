@@ -1,4 +1,5 @@
 """RoPE tests — rotation correctness, shapes, bijectivity, V untouched."""
+
 from __future__ import annotations
 
 import jax

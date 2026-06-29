@@ -1,4 +1,5 @@
 """CausalMQA tests."""
+
 from __future__ import annotations
 
 import jax
@@ -9,8 +10,9 @@ from model.attention.variants.mqa import CausalMQA
 
 
 def _init(d_model=64, n_heads=8):
-    return CausalMQA(d_model=d_model, n_heads=n_heads, n_kv_heads=1,
-                     theta_base=10000.0), jax.random.PRNGKey(0)
+    return CausalMQA(
+        d_model=d_model, n_heads=n_heads, n_kv_heads=1, theta_base=10000.0
+    ), jax.random.PRNGKey(0)
 
 
 def test_shape_preserved():

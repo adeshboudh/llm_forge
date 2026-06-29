@@ -1,4 +1,5 @@
 """CausalGQA tests."""
+
 from __future__ import annotations
 
 import jax
@@ -10,9 +11,9 @@ from model.attention.variants.gqa import CausalGQA
 
 
 def _init(d_model=64, n_heads=8, n_kv_heads=4):
-    return CausalGQA(d_model=d_model, n_heads=n_heads,
-                     n_kv_heads=n_kv_heads, theta_base=10000.0), \
-        jax.random.PRNGKey(0)
+    return CausalGQA(
+        d_model=d_model, n_heads=n_heads, n_kv_heads=n_kv_heads, theta_base=10000.0
+    ), jax.random.PRNGKey(0)
 
 
 def test_shape_preserved():

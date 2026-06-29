@@ -11,6 +11,7 @@ Convention (GPT-NeoX / Llama style):
         a' = a * cos - b * sin
         b' = a * sin + b * cos
 """
+
 from __future__ import annotations
 
 import jax.numpy as jnp
@@ -30,8 +31,8 @@ def _cos_sin(
 
 def _rotate(x: jnp.ndarray, cos: jnp.ndarray, sin: jnp.ndarray) -> jnp.ndarray:
     """Apply rotation to last dim of x. x: (..., D_h), cos/sin: (T, D_h/2)."""
-    x1 = x[..., 0::2]   # even indices: (..., D_h/2)
-    x2 = x[..., 1::2]   # odd indices
+    x1 = x[..., 0::2]  # even indices: (..., D_h/2)
+    x2 = x[..., 1::2]  # odd indices
     # Broadcast cos/sin over leading dims. cos: (T, D_h/2) -> (1, T, 1, D_h/2)
     # so the T axis aligns with the T axis of x (B, T, H, D_h).
     cos_b = jnp.expand_dims(cos, axis=(0, 2))
@@ -39,7 +40,7 @@ def _rotate(x: jnp.ndarray, cos: jnp.ndarray, sin: jnp.ndarray) -> jnp.ndarray:
     out1 = x1 * cos_b - x2 * sin_b
     out2 = x1 * sin_b + x2 * cos_b
     # interleave back: (..., 2i) = out1[..., i], (..., 2i+1) = out2[..., i]
-    stacked = jnp.stack((out1, out2), axis=-1)         # (..., D_h/2, 2)
+    stacked = jnp.stack((out1, out2), axis=-1)  # (..., D_h/2, 2)
     return stacked.reshape(x.shape)
 
 

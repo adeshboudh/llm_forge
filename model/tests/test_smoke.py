@@ -1,4 +1,5 @@
 """End-to-end smoke tests — full LM forward for each size, JIT compiles."""
+
 from __future__ import annotations
 
 import dataclasses

@@ -5,6 +5,7 @@
 Production standard (Llama 2/3, Mistral, Mixtral): KV cache is n_kv_heads/H
 the size of MHA, with negligible quality drop.
 """
+
 from __future__ import annotations
 
 import flax.linen as nn
@@ -23,6 +24,7 @@ class CausalGQA(nn.Module):
         n_kv_heads: Number of KV heads. Must divide n_heads.
         theta_base: RoPE base frequency.
     """
+
     d_model: int
     n_heads: int
     n_kv_heads: int
@@ -35,14 +37,22 @@ class CausalGQA(nn.Module):
         assert self.d_model % self.n_heads == 0
         self.d_head = self.d_model // self.n_heads
         self.n_rep = self.n_heads // self.n_kv_heads
-        self.W_q = self.param("W_q", nn.initializers.normal(stddev=0.02),
-                              (self.d_model, self.n_heads * self.d_head))
-        self.W_k = self.param("W_k", nn.initializers.normal(stddev=0.02),
-                              (self.d_model, self.n_kv_heads * self.d_head))
-        self.W_v = self.param("W_v", nn.initializers.normal(stddev=0.02),
-                              (self.d_model, self.n_kv_heads * self.d_head))
-        self.W_o = self.param("W_o", nn.initializers.normal(stddev=0.02),
-                              (self.n_heads * self.d_head, self.d_model))
+        self.W_q = self.param(
+            "W_q", nn.initializers.normal(stddev=0.02), (self.d_model, self.n_heads * self.d_head)
+        )
+        self.W_k = self.param(
+            "W_k",
+            nn.initializers.normal(stddev=0.02),
+            (self.d_model, self.n_kv_heads * self.d_head),
+        )
+        self.W_v = self.param(
+            "W_v",
+            nn.initializers.normal(stddev=0.02),
+            (self.d_model, self.n_kv_heads * self.d_head),
+        )
+        self.W_o = self.param(
+            "W_o", nn.initializers.normal(stddev=0.02), (self.n_heads * self.d_head, self.d_model)
+        )
 
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         B, T, D = x.shape

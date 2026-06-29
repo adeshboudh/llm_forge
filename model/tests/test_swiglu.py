@@ -1,4 +1,5 @@
 """SwiGLU MLP tests."""
+
 from __future__ import annotations
 
 import jax
@@ -11,8 +12,8 @@ from model.mlp.swiglu import SwiGLUMLP, compute_d_ff
 
 def test_compute_d_ff():
     # round(8/3 * D / 256) * 256
-    assert compute_d_ff(512) == 1280   # round(1365.33/256)*256 = 5*256 = 1280
-    assert compute_d_ff(768) == 2048   # round(2048/256)*256 = 8*256 = 2048
+    assert compute_d_ff(512) == 1280  # round(1365.33/256)*256 = 5*256 = 1280
+    assert compute_d_ff(768) == 2048  # round(2048/256)*256 = 8*256 = 2048
     assert compute_d_ff(1024) == 2816  # round(2730.67/256)*256 = 11*256 = 2816
 
 
@@ -58,8 +59,11 @@ def test_gradients_flow():
 
 
 def test_d_ff_config_match():
-    for name, expected in [("model_25m", 1280), ("model_125m", 2048), ("model_350m", 2816)]:
+    for name, expected in [("model_25m", 1280), ("model_125m", 2560), ("model_350m", 2816)]:
         cfg = load_model_config(name)
-        assert compute_d_ff(cfg.d_model) == expected, f"{name}: formula"
         assert cfg.d_ff == expected, f"{name}: yaml"
-        assert cfg.d_ff == compute_d_ff(cfg.d_model), f"{name}: mismatch"
+    # model_25m and model_350m d_ff match the standard formula;
+    # model_125m is tuned upward (2560 vs formula 2048) to land closer to 125M.
+    for name in ("model_25m", "model_350m"):
+        cfg = load_model_config(name)
+        assert cfg.d_ff == compute_d_ff(cfg.d_model), f"{name}: formula mismatch"

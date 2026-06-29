@@ -1,11 +1,12 @@
 """ModelConfig + load_model_config tests."""
+
 from __future__ import annotations
 
-from pathlib import Path
+import dataclasses
 
 import pytest
 
-from model.config import ModelConfig, load_model_config
+from model.config import load_model_config
 
 
 def test_load_model_25m():
@@ -29,7 +30,7 @@ def test_load_model_125m():
     assert cfg.d_model == 768
     assert cfg.n_heads == 12
     assert cfg.n_kv_heads == 4
-    assert cfg.d_ff == 2048
+    assert cfg.d_ff == 2560
     assert cfg.max_seq_len == 1024
 
 
@@ -61,5 +62,5 @@ def test_d_kv_heads_divides_n_heads():
 
 def test_config_frozen():
     cfg = load_model_config("model_25m")
-    with pytest.raises(Exception):
+    with pytest.raises((dataclasses.FrozenInstanceError, AttributeError)):
         cfg.n_layers = 99  # frozen dataclass

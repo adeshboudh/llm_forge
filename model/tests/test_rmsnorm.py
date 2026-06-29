@@ -1,4 +1,5 @@
 """RMSNorm tests."""
+
 from __future__ import annotations
 
 import jax
@@ -30,7 +31,7 @@ def test_output_rms_is_one():
     params = _make_params()
     x = jax.random.normal(jax.random.PRNGKey(1), (1, 4, 8))
     out = mod.apply(params, x)
-    rms = jnp.sqrt(jnp.mean(out ** 2, axis=-1))
+    rms = jnp.sqrt(jnp.mean(out**2, axis=-1))
     np.testing.assert_allclose(rms, jnp.ones_like(rms), atol=1e-4)
 
 
@@ -41,7 +42,7 @@ def test_scale_param_applied():
     params["params"]["scale"] = jnp.ones(8) * 2.0
     x = jax.random.normal(jax.random.PRNGKey(2), (1, 4, 8))
     out = mod.apply(params, x)
-    rms = jnp.sqrt(jnp.mean(out ** 2, axis=-1))
+    rms = jnp.sqrt(jnp.mean(out**2, axis=-1))
     np.testing.assert_allclose(rms, 2.0 * jnp.ones_like(rms), atol=1e-4)
 
 
@@ -84,6 +85,6 @@ def test_eps_applied():
     out_large = mod_large.apply(p_large, x)
     # With zero input, different eps shouldn't change zero output, so use nonzero input
     # RMS of out_small should be larger (smaller denominator)
-    rms_s = float(jnp.sqrt(jnp.mean(out_small ** 2)))
-    rms_l = float(jnp.sqrt(jnp.mean(out_large ** 2)))
+    rms_s = float(jnp.sqrt(jnp.mean(out_small**2)))
+    rms_l = float(jnp.sqrt(jnp.mean(out_large**2)))
     assert rms_s > rms_l

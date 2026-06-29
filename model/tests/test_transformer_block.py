@@ -1,14 +1,14 @@
 """TransformerBlock tests."""
+
 from __future__ import annotations
 
 import dataclasses
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 
-from model.config import load_model_config
 from model.blocks.transformer_block import TransformerBlock
+from model.config import load_model_config
 
 
 def _block_cfg(name="model_25m", attention="gqa"):
@@ -31,10 +31,10 @@ def test_param_count():
     block = TransformerBlock(config=cfg)
     params = block.init(jax.random.PRNGKey(0), jnp.ones((1, 4, cfg.d_model)))
     p = params["params"]
-    D, H, n_kv, D_h, I = cfg.d_model, cfg.n_heads, cfg.n_kv_heads, cfg.d_head, cfg.d_ff
+    D, H, n_kv, D_h, F = cfg.d_model, cfg.n_heads, cfg.n_kv_heads, cfg.d_head, cfg.d_ff
     norm_params = 2 * D
     attn_params = (D * H * D_h) + (D * n_kv * D_h) * 2 + (H * D_h * D)
-    mlp_params = 3 * D * I
+    mlp_params = 3 * D * F
     expected = norm_params + attn_params + mlp_params
     actual = 0
     for k1 in p:
@@ -54,8 +54,10 @@ def test_gradient_flow_to_all_paths():
         return jnp.sum(block.apply(p, x))
 
     grads = jax.grad(loss)(params)["params"]
+
     def any_nonzero(group):
         return any(jnp.any(grads[group][k] != 0) for k in grads[group])
+
     assert any_nonzero("norm1") or any_nonzero("attn")
     assert any_nonzero("mlp")
 

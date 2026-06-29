@@ -132,7 +132,7 @@ First run overshot the 10B budget by 7.5% (mid-shard flush race). Hard-cap fix l
 | Model    | n_layers | d_model | n_heads | n_kv  | d_ff  | ≈ params |
 | -------- | -------- | ------- | ------- | ----- | ----- | -------- |
 | model_25m  | 4        | 512     | 8       | 4     | 1280  | ~27.8M   |
-| model_125m | 12       | 768     | 12      | 4     | 2048  | ~125M    |
+| model_125m | 12       | 768     | 12      | 4     | 2560  | ~129M    |
 | model_350m | 24       | 1024    | 16      | 8     | 2816  | ~316M    |
 
 Note: d_ff values are computed from `compute_d_ff(d_model)` per Llama 8/3·D formula rounded to multiple of 256. `model_125m.yaml` had d_ff=3072 (spec error) and was corrected to 2048.

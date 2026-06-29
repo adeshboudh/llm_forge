@@ -4,6 +4,7 @@
 
 Llama convention: no bias, learnable scale only.
 """
+
 from __future__ import annotations
 
 import flax.linen as nn
@@ -18,6 +19,7 @@ class RMSNorm(nn.Module):
         dim: Feature dimension (last axis).
         eps: Numerical stability constant. Default 1e-6.
     """
+
     dim: int
     eps: float = 1e-6
 

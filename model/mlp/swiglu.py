@@ -8,6 +8,7 @@
 No biases. d_ff defaults to round(8/3 * d_model / 256) * 256 (Llama ratio,
 rounded to a multiple of 256 for hardware friendliness).
 """
+
 from __future__ import annotations
 
 import flax.linen as nn
@@ -29,6 +30,7 @@ class SwiGLUMLP(nn.Module):
         d_model: Input/output feature dim.
         d_ff:    Intermediate dim.
     """
+
     d_model: int
     d_ff: int
 
