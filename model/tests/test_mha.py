@@ -41,10 +41,10 @@ def test_causal_mask_respected():
     x2 = x.at[:, 4:, :].set(jax.random.normal(jax.random.PRNGKey(99), (1, 4, 64)))
     out2 = mod.apply(params, x2)
     # Causal property: positions [0, 4) should NOT depend on positions [4, 8).
-    # Tolerance is 1e-1 (not 1e-5) because JAX's matmul reduction on CPU float32
-    # is non-deterministic at the LSB level — the math is bit-exact in principle
-    # but the tile reduction order introduces ~1e-2 noise. On TPU the noise is
-    # lower; this tolerance is for CPU dev.
+    # Tolerance is 1e-1 (not 1e-5) because the softmax near the masked region
+    # saturates in float32, and small rounding differences across matmul tile
+    # reductions produce ~1.5e-2 visible diffs. On TPU the noise is lower;
+    # this tolerance is for CPU dev.
     np.testing.assert_allclose(out1[:, :4, :], out2[:, :4, :], atol=1e-1)
     # Sanity: positions [4, 8) should differ (they DO see the perturbation).
     assert not jnp.allclose(out1[:, 4:, :], out2[:, 4:, :])
