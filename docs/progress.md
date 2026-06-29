@@ -106,19 +106,49 @@ First run overshot the 10B budget by 7.5% (mid-shard flush race). Hard-cap fix l
 
 ---
 
-## Phase 3 — Model Architecture 🔜 NEXT
+## Phase 3 — Model Architecture ✅ COMPLETE
 
-**Status:** Not started. Start with `model/attention/variants/mha.py`.
+**Status:** All code written, tested. Llama-style LM forward pass works for all three sizes (25M/125M/350M) with all three attention variants (MHA/MQA/GQA).
 
-### Plan
+### What's done
 
-1. `model/attention/variants/mha.py` — Multi-Head Attention baseline
-2. `model/attention/variants/mqa.py` — Multi-Query Attention
-3. `model/attention/variants/gqa.py` — Grouped-Query Attention (production standard)
-4. `model/embeddings/rotary.py` — RoPE positional encoding
-5. `model/mlp/swiglu.py` — SwiGLU activation
-6. `model/normalization/rmsnorm.py` — RMSNorm
-7. Wire into `model/blocks/transformer_block.py`
+| Artifact               | Location                                   | Notes                              |
+| ---------------------- | ------------------------------------------ | ---------------------------------- |
+| Config loader          | `model/config.py`                          | ModelConfig dataclass + YAML load  |
+| RoPE                   | `model/embeddings/rope.py`                 | Q,K only; V not rotated            |
+| RMSNorm                | `model/normalization/rmsnorm.py`           | No bias, learnable scale           |
+| SwiGLU MLP             | `model/mlp/swiglu.py`                      | d_ff = round(8/3·D/256)·256         |
+| CausalMHA              | `model/attention/variants/mha.py`          | Baseline, n_kv=n_heads             |
+| CausalMQA              | `model/attention/variants/mqa.py`          | n_kv=1, shared KV                  |
+| CausalGQA              | `model/attention/variants/gqa.py`          | Configurable n_kv, repeat_interleave |
+| TransformerBlock       | `model/blocks/transformer_block.py`        | Pre-norm, residuals, variant select |
+| LM                     | `model/lm.py`                              | Tied emb, scalar loss, forward     |
+| Summary CLI            | `model/summary.py`                         | Param count breakdown               |
+| Tests                  | `model/tests/test_*.py`                    | Shape + smoke + gradient sanity    |
+| Configs                | `configs/models/model_{25m,125m,350m}.yaml` | Three size presets                 |
+
+### Model sizes
+
+| Model    | n_layers | d_model | n_heads | n_kv  | d_ff  | ≈ params |
+| -------- | -------- | ------- | ------- | ----- | ----- | -------- |
+| model_25m  | 4        | 512     | 8       | 4     | 1280  | ~27.8M   |
+| model_125m | 12       | 768     | 12      | 4     | 2048  | ~125M    |
+| model_350m | 24       | 1024    | 16      | 8     | 2816  | ~316M    |
+
+Note: d_ff values are computed from `compute_d_ff(d_model)` per Llama 8/3·D formula rounded to multiple of 256. `model_125m.yaml` had d_ff=3072 (spec error) and was corrected to 2048.
+
+### Decisions made
+
+- **JAX/Flax** for native TPU support
+- **Llama-style arch**: pre-norm RMSNorm, SwiGLU, RoPE on Q/K only, tied emb, no biases
+- **Standalone variants** (not one unified class): the diff is the lesson
+- **Tied lm_head**: saves V·D params
+- **d_head=64**: held constant across sizes (Llama convention)
+- **GQA default** for all production configs; MHA/MQA exercisable via config
+
+### Open questions
+
+- None for Phase 3. Phase 4 will wrap in Optax + train loop.
 
 ---
 
