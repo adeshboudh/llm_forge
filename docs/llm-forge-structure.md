@@ -429,7 +429,7 @@ class DataConfig:
     dataset_version: str = "v1-bpe32k-fineweb2B"
     tokenizer_path: str = "./tokenizer/tokenizer.json"
     vocab_size: int = 32_768
-    shard_dir: str = "/kaggle/input/llm-forge-tokens-v1/"
+    shard_dir: str = "/kaggle/input/datasets/adeshboudh/llm-forge-tokens-v1/"
     total_tokens: int = 2_000_000_000
 ```
 

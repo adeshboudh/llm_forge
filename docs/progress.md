@@ -71,19 +71,20 @@ First run overshot the 10B budget by 7.5% (mid-shard flush race). Hard-cap fix l
 
 | Version                       | Tokens      | Shards | For model   | Source                          |
 | ----------------------------- | ----------- | ------ | ----------- | ------------------------------- |
-| `v1-bpe32k-fineweb10B-overshoot` | 10,750,000,000 | 215    | 350M params | full uploaded set (7.5% over)  |
+| `v1-bpe32k-fineweb10B-overshoot` | 10,750,000,000 | 215    | all sizes    | full uploaded set (7.5% over)  |
 | 25M training                  | first 1B    | 20     | 25M params  | first ~20 shards                |
 | 125M training                 | first 5B    | 100    | 125M params | first ~100 shards               |
 
 **Why one set:** shards are flat uint16 token streams in deterministic stream order. The loader slices by `seq_len`/`total_tokens` at training time. Running 3 separate shard jobs = 3× disk, 3× upload, 3× version churn for no benefit. Subset = prefix of the same file set.
 
-### Generated shard set — `llm-forge-tokens-v1-overshoot`
+### Generated shard set — `llm-forge-tokens-v1`
 
 - **Tokens:** 10,750,000,000 (215 shards × 50M; 7.5% over the 10B target)
 - **Disk:** ~21.5 GB
 - **Format:** uint16 `.npy`, 50M tokens/shard, `metadata.json` with full shard index
-- **Pushed to:** Kaggle Dataset `llm-forge-tokens-v1-overshoot`
-- **Mount path on Kaggle:** `/kaggle/input/llm-forge-tokens-v1-overshoot/`
+- **Pushed to:** Kaggle Dataset `llm-forge-tokens-v1` (owner `adeshboudh`)
+- **Mount path on Kaggle:** `/kaggle/input/datasets/adeshboudh/llm-forge-tokens-v1/`
+- **Shard files:** `shard_00000.npy` … `shard_00214.npy` (zero-padded 5 digits)
 - **Why overshoot:** initial pipeline flushed a full shard after `total_tokens` already passed the budget. Fixed by hard-cap in `pipeline.py` — last doc is now truncated to fit.
 - **Acceptable for training:** yes. 25M/125M subsets unaffected. 350M will use first 200 shards (10B) — last 15 shards are dead weight, can be ignored at training time.
 
@@ -181,4 +182,4 @@ Note: d_ff values are computed from `compute_d_ff(d_model)` per Llama 8/3·D for
 | Kaggle Dataset                       | Contents                                          | Status         |
 | ------------------------------------ | ------------------------------------------------- | -------------- |
 | `llm-forge-tokenizer-v1`             | `tokenizer.json`, `vocab.json`, `merges.txt`      | ⏳ Not uploaded |
-| `llm-forge-tokens-v1-overshoot`      | 215 × `shard_*.npy` + `metadata.json` (10.75B)    | ✅ Pushed       |
+| `llm-forge-tokens-v1`      | 215 × `shard_*.npy` + `metadata.json` (10.75B)    | ✅ Pushed       |

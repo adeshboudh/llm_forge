@@ -45,3 +45,5 @@ versions:
     notes: 350M model training, full sample-10BT
 
 kaggle_dataset: llm-forge-tokens-v1
+kaggle_owner: adeshboudh
+# Kaggle mount path: /kaggle/input/datasets/adeshboudh/llm-forge-tokens-v1/

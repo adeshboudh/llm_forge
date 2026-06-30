@@ -153,7 +153,7 @@ cat > "${STAGE_DIR}/dataset-metadata.json" <<EOF
 {
   "title": "LLM-Forge Tokens v1 (FineWeb-Edu, BPE 32k)",
   "id": "${KAGGLE_USERNAME}/${DATASET_SLUG}",
-  "description": "uint16 .npy token shards for llm_forge pretraining.\n\nSource: HuggingFaceFW/fineweb-edu (sample-10BT config).\nTokenizer: BPE 32k trained on 1B chars FineWeb-Edu (see llm-forge-tokenizer-v1).\nShard size: 50M tokens (~100MB per .npy file).\nTotal: ${SHARD_COUNT} shards, ${TOTAL_SIZE}.\n\nLoad with: from data.loaders.npy_loader import ShardedTokenDataset\n  ds = ShardedTokenDataset('/kaggle/input/${DATASET_SLUG}', seq_len=1024)",
+  "description": "uint16 .npy token shards for llm_forge pretraining.\n\nSource: HuggingFaceFW/fineweb-edu (sample-10BT config).\nTokenizer: BPE 32k trained on 1B chars FineWeb-Edu (see llm-forge-tokenizer-v1).\nShard size: 50M tokens (~100MB per .npy file).\nTotal: ${SHARD_COUNT} shards, ${TOTAL_SIZE}.\n\nLoad with: from data.loaders.npy_loader import ShardedTokenDataset\n  ds = ShardedTokenDataset('/kaggle/input/datasets/${KAGGLE_USERNAME}/${DATASET_SLUG}', seq_len=1024)",
   "licenses": [{"name": "odc-by"}],
   "keywords": ["llm", "pretraining", "tokens", "fineweb-edu", "bpe"],
   "collaborators": []
@@ -203,7 +203,7 @@ echo "  dataset URL: https://www.kaggle.com/datasets/${KAGGLE_USERNAME}/${DATASE
 echo ""
 echo "To use in a kaggle notebook:"
 echo "  1. Sidebar → + Add data → Your datasets → ${DATASET_SLUG}"
-echo "  2. Mount path: /kaggle/input/${DATASET_SLUG}/"
+echo "  2. Mount path: /kaggle/input/datasets/${KAGGLE_USERNAME}/${DATASET_SLUG}/"
 echo ""
 echo "Cleaning up staging dir..."
 rm -rf "${STAGE_DIR}"
