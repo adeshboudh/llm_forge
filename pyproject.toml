@@ -15,6 +15,8 @@ dependencies = [
     "jax>=0.4.20",
     "flax>=0.8.0",
     "pyyaml>=6.0",
+    "optax>=0.2.0",
+    "orbax-checkpoint>=0.5.0",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +34,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["tokenizer", "data"]
+packages = ["tokenizer", "data", "model", "training"]
 
 [tool.ruff]
 line-length = 100
@@ -43,5 +45,5 @@ select = ["E", "F", "W", "I", "B", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tokenizer/tests", "data/tests"]
+testpaths = ["tokenizer/tests", "data/tests", "model/tests", "training/tests", "data/loaders/tests"]
 addopts = "-ra"

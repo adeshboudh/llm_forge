@@ -798,6 +798,8 @@ dependencies = [
     { name = "jax" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "optax" },
+    { name = "orbax-checkpoint" },
     { name = "pyyaml" },
     { name = "tqdm" },
 ]
@@ -815,6 +817,8 @@ requires-dist = [
     { name = "flax", specifier = ">=0.8.0" },
     { name = "jax", specifier = ">=0.4.20" },
     { name = "numpy", specifier = ">=2.0" },
+    { name = "optax", specifier = ">=0.2.0" },
+    { name = "orbax-checkpoint", specifier = ">=0.5.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "pyyaml", specifier = ">=6.0" },
