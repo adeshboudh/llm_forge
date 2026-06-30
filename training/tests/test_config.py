@@ -68,6 +68,13 @@ def test_yaml_suffix_optional():
     assert a == b
 
 
+def test_full_path_accepted():
+    """--config configs/training/model_25m.yaml must work (CLI passes full path)."""
+    a = load_training_config("model_25m", configs_dir=_CONFIGS_DIR)
+    b = load_training_config(str(_CONFIGS_DIR / "model_25m.yaml"))
+    assert a == b
+
+
 def test_config_is_frozen():
     cfg = load_training_config("model_25m", configs_dir=_CONFIGS_DIR)
     with pytest.raises(dataclasses.FrozenInstanceError):

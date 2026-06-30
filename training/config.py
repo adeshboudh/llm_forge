@@ -73,18 +73,25 @@ def load_training_config(
     """Load a TrainConfig from {configs_dir}/{name}.yaml.
 
     Args:
-        name: Config basename (e.g. "model_25m"); .yaml suffix optional.
+        name: Config basename (e.g. "model_25m") or full path
+              (e.g. "configs/training/model_25m.yaml"). If it contains a
+              directory separator, treated as a full path and loaded as-is.
+              Otherwise, looked up under `configs_dir` (or default).
         configs_dir: Override configs directory. Defaults to configs/training.
 
     Raises:
         KeyError: If config file not found.
     """
-    cfg_dir = configs_dir or _CONFIGS_DIR
-    if not name.endswith(".yaml"):
-        name = f"{name}.yaml"
-    path = cfg_dir / name
+    name_path = Path(name)
+    if "/" in name or name_path.is_absolute() or name_path.exists():
+        path = name_path
+    else:
+        if not name.endswith(".yaml"):
+            name = f"{name}.yaml"
+        cfg_dir = configs_dir or _CONFIGS_DIR
+        path = cfg_dir / name
     if not path.exists():
-        raise KeyError(f"Config '{name}' not found in {cfg_dir}")
+        raise KeyError(f"Config '{path}' not found")
     raw: dict[str, Any] = yaml.safe_load(path.read_text())
     return TrainConfig(
         model_name=raw["model_name"],
