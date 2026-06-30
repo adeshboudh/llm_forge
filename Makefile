@@ -12,7 +12,7 @@ PYTEST   := $(UV) run pytest
 RUFF     := $(UV) run ruff
 
 # ----- shared -----
-.PHONY: help sync install lint format clean model-test model-summary model-summary-25m model-summary-125m model-summary-350m
+.PHONY: help sync install lint format clean model-test model-summary model-summary-25m model-summary-125m model-summary-350m train-smoke train-25m train-test train-summary
 
 help:
 	@echo "llm_forge Makefile"
@@ -41,6 +41,12 @@ help:
 	@echo "Phase 3 — Model:"
 	@echo "  make model-test      run model unit tests"
 	@echo "  make model-summary   print param count for --name=NAME"
+	@echo ""
+	@echo "Phase 4 — Training:"
+	@echo "  make train-smoke         5-step CPU run with toy shards"
+	@echo "  make train-25m           full 1B-token run (Kaggle TPU v5e-8)"
+	@echo "  make train-test          run training unit tests"
+	@echo "  make train-summary CONFIG=configs/training/model_25m.yaml   pre-run summary"
 
 install:
 	$(UV) sync --extra dev
@@ -161,3 +167,21 @@ model-summary-125m:
 
 model-summary-350m:
 	$(PY) -m model.summary --name model_350m
+
+# =============================================================================
+# Phase 4 — Pretraining (JAX/Flax + optax + orbax on Kaggle TPU v5e-8)
+# =============================================================================
+.PHONY: train-smoke train-25m train-test train-summary
+
+train-smoke:
+	$(PY) -m training.train --config configs/training/smoke_test.yaml --smoke
+
+train-25m:
+	$(PY) -m training.train --config configs/training/model_25m.yaml
+
+train-test:
+	$(PYTEST) training/tests/ -v
+
+train-summary:
+	@test -n "$(CONFIG)" || (echo "Usage: make train-summary CONFIG=configs/training/model_25m.yaml" && exit 1)
+	$(PY) -m training.summary --config $(CONFIG)

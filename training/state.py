@@ -68,7 +68,8 @@ def create_train_state(
 
 def save(state: train_state.TrainState, path: Path | str) -> None:
     """Save state to `path` via orbax PyTreeCheckpointer (async on TPU)."""
-    path = Path(path)
+    path = Path(path).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
     target = {"params": state.params, "opt_state": state.opt_state, "step": int(state.step)}
     # orbax>=0.6 deprecated `force=`; use positional `directory` (was `dir`).
     ocp.PyTreeCheckpointer().save(path, target)
