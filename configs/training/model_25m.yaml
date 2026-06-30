@@ -1,0 +1,32 @@
+# Phase 4 — 25M pretraining config (1B tokens, Kaggle TPU v5e-8)
+model_name: model_25m
+
+dataset:
+  shard_dir: /kaggle/input/datasets/adeshboudh/llm-forge-tokens-v1/
+  seq_len: 1024
+  val_shard: 214                 # shard_00214.npy (50M tokens, 0.5% holdout)
+
+train:
+  batch_size: 128                # per-host; → 16/core × 8 cores via jit sharding
+  total_steps: 9766              # 1B / (128 × 1024)
+  warmup_steps: 200
+  weight_decay: 0.1
+  grad_clip: 1.0
+  grad_accum: 1                  # HBM permits full batch at 25M
+
+optim:
+  lr_peak: 3.0e-4
+  lr_min: 3.0e-5
+  b1: 0.9
+  b2: 0.95
+  eps: 1.0e-8
+
+ckpt:
+  save_every: 500
+  output_dir: /kaggle/working/ckpt/
+
+log:
+  log_file: /kaggle/working/train_log.jsonl
+  log_every: 1
+  eval_every: 500
+  eval_batches: 50
