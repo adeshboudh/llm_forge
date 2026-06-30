@@ -124,9 +124,9 @@ v5e's **MXU** (matmul unit) requires bf16×bf16 → fp32-accumulate. But HBM and
 ### 4.1 Components
 
 - `training/tpu.py`:
-  - `setup_tpu()` — `jax.devices()` returns device list. Same call works on CPU (1 CPU) and Kaggle TPU v5e-8 (8 TPU devices). No branching.
+  - `setup_devices()` — `jax.devices()` returns device list. Same call works on CPU (1 CPU) and Kaggle TPU v5e-8 (8 TPU devices). No branching.
   - `make_mesh()` — `jax.sharding.Mesh(devices, ("batch",))` (1D)
-  - `make_partition_specs()` — returns the `PartitionSpec` tuple for pjit inputs/outputs.
+  - `make_input_sharding()` / `make_param_sharding()` / `make_loss_sharding()` — three `NamedSharding` helpers for pjit inputs/outputs.
 
 ### 4.2 PartitionSpecs
 
@@ -305,7 +305,7 @@ training/
   config.py        ~70 lines   TrainConfig dataclass + load_training_config() + helper dataclasses
   state.py         ~90 lines   create_train_state(), save(), restore() via orbax
   train_step.py   ~110 lines   pjit train_step + jit eval_step + bf16 loss closure + wd_mask
-  tpu.py           ~80 lines   setup_tpu(), make_mesh(), make_partition_specs(), tpu_context()
+  tpu.py           ~50 lines   setup_devices(), make_mesh(), make_input_sharding(), make_param_sharding(), make_loss_sharding(), tpu_context()
   train.py        ~120 lines   train loop + argparse CLI + JSONL logger + emergency save
   summary.py       ~50 lines   echo TrainConfig + devices + params + ETA
   __init__.py
