@@ -90,6 +90,8 @@ def load_training_config(
             name = f"{name}.yaml"
         cfg_dir = configs_dir or _CONFIGS_DIR
         path = cfg_dir / name
+    if path.suffix != ".yaml":
+        path = path.with_suffix(".yaml")
     if not path.exists():
         raise KeyError(f"Config '{path}' not found")
     raw: dict[str, Any] = yaml.safe_load(path.read_text())

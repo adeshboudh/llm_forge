@@ -73,6 +73,9 @@ def test_full_path_accepted():
     a = load_training_config("model_25m", configs_dir=_CONFIGS_DIR)
     b = load_training_config(str(_CONFIGS_DIR / "model_25m.yaml"))
     assert a == b
+    # Same path without .yaml suffix should also work.
+    c = load_training_config(str(_CONFIGS_DIR / "model_25m"))
+    assert a == c
 
 
 def test_config_is_frozen():
