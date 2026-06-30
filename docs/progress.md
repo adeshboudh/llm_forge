@@ -153,7 +153,52 @@ Note: d_ff values are computed from `compute_d_ff(d_model)` per Llama 8/3·D for
 
 ---
 
-## Phase 4 — Pretraining 🔓 Data ready, blocked on Phase 3
+## Phase 4 — Pretraining ✅ COMPLETE (framework)
+
+**Status:** Training stack built and CPU-smoke-validated end-to-end on `model_25m` (5 steps). Full 1B-token Kaggle TPU run launched from `notebooks/phase4-training/train_25m.ipynb`.
+
+### What's done
+
+| Artifact            | Location                                | Notes                                    |
+| ------------------- | --------------------------------------- | ---------------------------------------- |
+| TrainConfig         | `training/config.py`                    | Frozen dataclass + load_training_config  |
+| TPU helpers          | `training/tpu.py`                       | 1D mesh, NamedSharding helpers, context  |
+| TrainState          | `training/state.py`                     | fp32 master, AdamW, orbax save/restore   |
+| Train/eval step     | `training/train_step.py`                | Mixed bf16 compute + fp32 master + grad_norm |
+| Train loop + CLI    | `training/train.py`                     | argparse + tqdm + JSONL + emergency save |
+| Pre-run summary      | `training/summary.py`                    | Prints config + devices + params + ETA   |
+| Host batcher        | `data/loaders/jax_batcher.py`           | Wraps ShardedTokenDataset; train/val split |
+| YAML configs        | `configs/training/{model_25m,smoke_test}.yaml` |                                |
+| Kaggle notebook     | `notebooks/phase4-training/train_25m.ipynb` | Thin wrapper for the real 1B run     |
+| Make targets        | `Makefile`                              | train-smoke / train-25m / train-test    |
+
+### Hyperparameters (model_25m)
+
+| Param | Value |
+|-------|-------|
+| tokens | ~1.28B (9766 steps × 128 × 1024) |
+| steps | 9766 |
+| batch_size | 128 (16/core × 8) |
+| seq_len | 1024 |
+| optim | AdamW (b1=0.9, b2=0.95, eps=1e-8) |
+| schedule | cosine warmup, peak 3e-4 → 3e-5 over 9766 steps |
+| weight_decay | 0.1 (masked: 1D + tok_emb skipped) |
+| grad_clip | 1.0 |
+| precision | mixed bf16 compute / fp32 master |
+| val split | shard_00214 (50M tokens) |
+| eval | every 500 steps, 50 batches |
+
+### Decisions made
+
+- **Data-parallel pjit** (1D mesh, batch split across 8 TPU cores). Weights replicated.
+- **Mixed precision bf16 compute + fp32 master.** Cast in loss closure: 2D+ params → bf16, 1D norm scales stay fp32. Grads auto-promote fp32.
+- **AdamW + cosine warmup** (3e-4 peak, 200 warmup, 9766 cosine decay to 3e-5).
+- **Weight decay mask** skips 1D params + `tok_emb` (Llama convention).
+- **Orbax checkpoint** async to `/kaggle/working/ckpt/<step>/` + emergency save on preemption/NaN.
+- **JSONL logging** for diffable/greppable metric history (no W&B dep).
+- **`JAXBatcher`** wraps Phase 2 `ShardedTokenDataset`, host-side np arrays; val shard reserved.
+- **CLI `--smoke --resume --max-steps`** for CPU testing + resume + short Kaggle sanity.
+- **Kaggle notebook is thin wrapper** around the CLI (real logic lives in `training/` Python pkg, testable on CPU).
 
 ## Phase 5 — Post-Training 🔒 BLOCKED on Phase 4
 
