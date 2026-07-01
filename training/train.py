@@ -179,6 +179,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--resume", default=None, help="Path to orbax checkpoint dir to restore from")
     p.add_argument("--smoke", action="store_true", help="Run on toy shards (overwrites shard_dir)")
     p.add_argument("--max-steps", type=int, default=None, help="Override total_steps")
+    p.add_argument("--batch-size", type=int, default=None, help="Override train.batch_size")
+    p.add_argument("--seq-len", type=int, default=None, help="Override dataset.seq_len")
     return p.parse_args(argv)
 
 
@@ -206,6 +208,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_steps is not None:
         cfg = dataclasses.replace(
             cfg, train=dataclasses.replace(cfg.train, total_steps=args.max_steps)
+        )
+    if args.batch_size is not None:
+        cfg = dataclasses.replace(
+            cfg, train=dataclasses.replace(cfg.train, batch_size=args.batch_size)
+        )
+    if args.seq_len is not None:
+        cfg = dataclasses.replace(
+            cfg, dataset=dataclasses.replace(cfg.dataset, seq_len=args.seq_len)
         )
     if args.smoke:
         _bootstrap_smoke_shards(Path(cfg.dataset.shard_dir))
