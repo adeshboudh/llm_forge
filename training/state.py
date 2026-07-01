@@ -96,10 +96,12 @@ def restore(
 def _make_lr_schedule(config: TrainConfig):
     import optax
 
+    warmup_steps = min(config.train.warmup_steps, max(1, config.train.total_steps // 2))
+
     return optax.warmup_cosine_decay_schedule(
         init_value=0.0,
         peak_value=config.optim.lr_peak,
-        warmup_steps=config.train.warmup_steps,
+        warmup_steps=warmup_steps,
         decay_steps=config.train.total_steps,
         end_value=config.optim.lr_min,
     )

@@ -122,3 +122,19 @@ def test_apply_gradients_advances_step(toy_config):
     grads = jax.tree_util.tree_map(jnp.zeros_like, state.params)
     new_state = state.apply_gradients(grads=grads)
     assert int(new_state.step) == int(state.step) + 1
+
+
+def test_lr_schedule_clamps_warmup_when_total_steps_shorter(toy_config):
+    """--max-steps 50 with warmup_steps=200 must not raise; warmup is clamped."""
+    import dataclasses
+
+    from training.state import _make_lr_schedule
+
+    cfg = dataclasses.replace(
+        toy_config,
+        train=dataclasses.replace(toy_config.train, total_steps=50, warmup_steps=200),
+    )
+    sched = _make_lr_schedule(cfg)
+    assert float(sched(0)) == 0.0
+    assert float(sched(50 // 2)) > 0.0
+    assert float(sched(cfg.train.total_steps - 1)) < float(cfg.optim.lr_peak)
