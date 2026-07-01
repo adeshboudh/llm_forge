@@ -79,18 +79,30 @@ _PARAM_SHARDING = make_param_sharding(_MESH)
 _LOSS_SHARDING = make_loss_sharding(_MESH)
 
 
+@jax.jit(
+    in_shardings=(_PARAM_SHARDING, _INPUT_SHARDING, _INPUT_SHARDING),
+    out_shardings=None,
+)
+def _train_loss_and_grad(params, input_ids, target_ids):
+    """Sharded train loss + grad. Input batch is split across cores; params + loss are replicated."""
+    return _loss_for_vg(params, input_ids, target_ids)
+
+
+@jax.jit(
+    in_shardings=(_PARAM_SHARDING, _INPUT_SHARDING, _INPUT_SHARDING),
+    out_shardings=None,
+)
+def _eval_loss_jit(params, input_ids, target_ids):
+    return _loss_no_grad(params, input_ids, target_ids)
+
+
 def train_step(state, input_ids, target_ids):
     """One training step. Returns (new_state, loss, metrics)."""
-    loss, grads = _loss_for_vg(state.params, input_ids, target_ids)
+    loss, grads = _train_loss_and_grad(state.params, input_ids, target_ids)
     new_state = state.apply_gradients(grads=grads)
     return new_state, loss, {"grad_norm": _grad_norm(grads)}
 
 
-@jax.jit
-def _eval_step_jit(params, input_ids, target_ids):
-    return _loss_no_grad(params, input_ids, target_ids)
-
-
 def eval_step(state, input_ids, target_ids):
     """Eval: returns scalar loss only (no grads, no param update)."""
-    return _eval_step_jit(state.params, input_ids, target_ids)
+    return _eval_loss_jit(state.params, input_ids, target_ids)
