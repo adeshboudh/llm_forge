@@ -129,8 +129,15 @@ def train(config: TrainConfig, resume_path: Path | None = None) -> list[float]:
                     save(state, Path(config.ckpt.output_dir) / f"step_{step:010d}")
 
             save(state, Path(config.ckpt.output_dir) / f"step_{total_steps:010d}_final")
+            from training.export import export_state_params
+            export_state_params(
+                state, Path(config.ckpt.output_dir) / f"step_{total_steps:010d}_final" / "params.safetensors"
+            )
     except RuntimeError as e:
-        save(state, Path(config.ckpt.output_dir) / f"emergency_{int(state.step):010d}")
+        emergency_path = Path(config.ckpt.output_dir) / f"emergency_{int(state.step):010d}"
+        save(state, emergency_path)
+        from training.export import export_state_params
+        export_state_params(state, emergency_path / "params.safetensors")
         log_file.write(
             json.dumps({"event": "preemption", "step": int(state.step), "err": str(e)}) + "\n"
         )
