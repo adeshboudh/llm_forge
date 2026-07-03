@@ -183,13 +183,32 @@ def push_to_hub(
         repo_id: e.g. ``adesh01/llm_forge-25m``.
         private: If True, create a private repo. Default public.
         commit_message: Git commit message.
-        token: HF token. If None, reads from ``HF_TOKEN`` env var or
-            ``huggingface-cli login`` cache.
+        token: HF write token. Resolution order:
+            1. ``token=`` argument
+            2. ``HF_TOKEN`` env var
+            3. ``huggingface-cli login`` cache
 
     Returns:
         The repo URL on the Hub.
+
+    Raises:
+        RuntimeError: With setup instructions if no token is found.
     """
+    import os
+
     from huggingface_hub import HfApi
+
+    if token is None:
+        token = os.environ.get("HF_TOKEN")
+    if token is None:
+        raise RuntimeError(
+            "No HF token found. On Kaggle, add a 'HF_TOKEN' secret "
+            "(https://huggingface.co/settings/tokens, write scope) and "
+            "expose it in the notebook:\n"
+            "  from kaggle_secrets import UserSecretsClient\n"
+            "  import os; os.environ['HF_TOKEN'] = UserSecretsClient().get_secret('HF_TOKEN')\n"
+            "Or set os.environ['HF_TOKEN'] = 'hf_...' inline."
+        )
 
     api = HfApi(token=token)
     api.create_repo(repo_id, exist_ok=True, private=private)

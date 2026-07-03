@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 
 import jax
+import pytest
+from safetensors.numpy import load_file
 
 from model.config import load_model_config
 from model.lm import LM
@@ -132,8 +134,6 @@ def test_export_hf_readme_includes_repo_id(toy_config, tmp_path):
 
 def test_export_hf_params_loadable(toy_config, tmp_path):
     """Round-trip: load the safetensors back and check shapes match."""
-    from safetensors.numpy import load_file
-
     cfg = _small_model_cfg()
     state = _state(toy_config, cfg)
     out = export_hf(cfg, state.params, tmp_path / "hf", tokens_trained=0, num_steps=0)
@@ -155,3 +155,58 @@ def test_export_hf_no_tokenizer_when_disabled(toy_config, tmp_path):
         include_tokenizer=False,
     )
     assert not (out / "tokenizer.json").exists()
+
+
+def test_push_to_hub_raises_without_token(monkeypatch, tmp_path):
+    """No token in env, no token in cli cache -> clear RuntimeError."""
+    import huggingface_hub
+
+    from training.export_hf import push_to_hub
+
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+
+    class FakeApi:
+        def __init__(self, token=None):
+            pass
+
+        def create_repo(self, *a, **kw):
+            pass
+
+        def upload_folder(self, *a, **kw):
+            pass
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    (tmp_path / "dummy.txt").write_text("x")
+    with pytest.raises(RuntimeError, match="No HF token found"):
+        push_to_hub(tmp_path, "fake/repo")
+
+
+def test_push_to_hub_reads_hf_token_env(monkeypatch, tmp_path):
+    """HF_TOKEN env var is picked up; we mock the HfApi to avoid network."""
+    import huggingface_hub
+
+    from training.export_hf import push_to_hub
+
+    monkeypatch.setenv("HF_TOKEN", "hf_fake_test_token")
+
+    captured = {}
+
+    class FakeApi:
+        def __init__(self, token=None):
+            captured["token"] = token
+
+        def create_repo(self, repo_id, exist_ok=False, private=False):
+            captured["repo_id"] = repo_id
+            captured["private"] = private
+
+        def upload_folder(self, folder_path, repo_id, commit_message):
+            captured["folder"] = folder_path
+            captured["msg"] = commit_message
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    (tmp_path / "x.txt").write_text("x")
+    url = push_to_hub(tmp_path, "fake/repo", private=True)
+    assert url == "https://huggingface.co/fake/repo"
+    assert captured["token"] == "hf_fake_test_token"
+    assert captured["repo_id"] == "fake/repo"
+    assert captured["private"] is True
