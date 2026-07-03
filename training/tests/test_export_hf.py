@@ -132,6 +132,22 @@ def test_export_hf_readme_includes_repo_id(toy_config, tmp_path):
     assert "load_model_config" in readme  # usage example uses real API
 
 
+def test_export_hf_readme_has_yaml_frontmatter(toy_config, tmp_path):
+    """HF requires YAML metadata block; check it starts with --- and has tags."""
+    cfg = _small_model_cfg()
+    state = _state(toy_config, cfg)
+    out = export_hf(cfg, state.params, tmp_path / "hf", tokens_trained=0, num_steps=0)
+    readme = (out / "README.md").read_text()
+    assert readme.startswith("---"), "README must start with YAML frontmatter"
+    body = readme.split("---", 2)
+    assert len(body) >= 3, "README must have closing ---"
+    frontmatter = body[1]
+    assert "license:" in frontmatter
+    assert "tags:" in frontmatter
+    assert "llm" in frontmatter
+    assert "library_name:" in frontmatter
+
+
 def test_export_hf_params_loadable(toy_config, tmp_path):
     """Round-trip: load the safetensors back and check shapes match."""
     cfg = _small_model_cfg()
