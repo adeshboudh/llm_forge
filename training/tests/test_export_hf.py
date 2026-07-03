@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 
 import jax
-import pytest
 from safetensors.numpy import load_file
 
 from model.config import load_model_config
@@ -171,98 +170,3 @@ def test_export_hf_no_tokenizer_when_disabled(toy_config, tmp_path):
         include_tokenizer=False,
     )
     assert not (out / "tokenizer.json").exists()
-
-
-def test_push_to_hub_raises_without_token(monkeypatch, tmp_path):
-    """No token in env, no token in cli cache -> clear RuntimeError."""
-    import huggingface_hub
-
-    from training.export_hf import push_to_hub
-
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-
-    class FakeApi:
-        def __init__(self, token=None):
-            pass
-
-        def create_repo(self, *a, **kw):
-            pass
-
-        def upload_folder(self, *a, **kw):
-            pass
-
-    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
-    (tmp_path / "dummy.txt").write_text("x")
-    with pytest.raises(RuntimeError, match="No HF token found"):
-        push_to_hub(tmp_path, "fake/repo")
-
-
-def test_push_to_hub_reads_hf_token_env(monkeypatch, tmp_path):
-    """HF_TOKEN env var is picked up; we mock the HfApi to avoid network."""
-    import huggingface_hub
-
-    from training.export_hf import push_to_hub
-
-    monkeypatch.setenv("HF_TOKEN", "hf_fake_test_token")
-
-    captured = {}
-
-    class FakeApi:
-        def __init__(self, token=None):
-            captured["token"] = token
-
-        def create_repo(self, repo_id, exist_ok=False, private=False):
-            captured["repo_id"] = repo_id
-            captured["private"] = private
-
-        def upload_folder(self, folder_path, repo_id, commit_message):
-            captured["folder"] = folder_path
-            captured["msg"] = commit_message
-
-    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
-    (tmp_path / "x.txt").write_text("x")
-    url = push_to_hub(tmp_path, "fake/repo", private=True)
-    assert url == "https://huggingface.co/fake/repo"
-    assert captured["token"] == "hf_fake_test_token"
-    assert captured["repo_id"] == "fake/repo"
-    assert captured["private"] is True
-
-
-def test_push_readme_to_hub(monkeypatch, tmp_path):
-    """push_readme_to_hub uploads a single file without re-pushing the dir."""
-    import huggingface_hub
-    from training.export_hf import push_readme_to_hub
-
-    monkeypatch.setenv("HF_TOKEN", "hf_fake")
-
-    captured = {}
-
-    class FakeApi:
-        def __init__(self, token=None):
-            pass
-
-        def upload_file(self, path_or_fileobj, path_in_repo, repo_id, commit_message):
-            captured["path"] = path_or_fileobj
-            captured["path_in_repo"] = path_in_repo
-            captured["repo_id"] = repo_id
-            captured["msg"] = commit_message
-
-    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
-    readme = tmp_path / "README.md"
-    readme.write_text("---\nlicense: apache-2.0\n---\n# hi\n")
-    url = push_readme_to_hub(readme, "fake/repo", commit_message="fix frontmatter")
-    assert url == "https://huggingface.co/fake/repo"
-    assert captured["path_in_repo"] == "README.md"
-    assert captured["repo_id"] == "fake/repo"
-    assert "fix frontmatter" in captured["msg"]
-
-
-def test_push_readme_raises_without_token(monkeypatch, tmp_path):
-    """No token -> clear RuntimeError, like push_to_hub."""
-    from training.export_hf import push_readme_to_hub
-
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    readme = tmp_path / "README.md"
-    readme.write_text("x")
-    with pytest.raises(RuntimeError, match="No HF token found"):
-        push_readme_to_hub(readme, "fake/repo")

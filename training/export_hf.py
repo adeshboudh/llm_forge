@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import shutil
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -92,7 +91,7 @@ def _write_readme(
         "",
         f"# {repo_id or cfg.name}",
         "",
-        f"Llama-style transformer trained from scratch in JAX/Flax.",
+        "Llama-style transformer trained from scratch in JAX/Flax.",
         "",
         f"- **Architecture:** {cfg.architecture}",
         f"- **Target size:** {cfg.target_params / 1e6:.0f}M parameters",
@@ -183,84 +182,3 @@ def export_hf(
         repo_id=repo_id,
     )
     return output_dir
-
-
-def push_to_hub(
-    output_dir: str | Path,
-    repo_id: str,
-    *,
-    private: bool = False,
-    commit_message: str = "Upload trained model",
-    token: str | None = None,
-) -> str:
-    """Upload an exported HF directory to the Hub.
-
-    Args:
-        output_dir: Local directory written by ``export_hf``.
-        repo_id: e.g. ``adesh01/llm_forge-25m``.
-        private: If True, create a private repo. Default public.
-        commit_message: Git commit message.
-        token: HF write token. Resolution order:
-            1. ``token=`` argument
-            2. ``HF_TOKEN`` env var
-            3. ``huggingface-cli login`` cache
-
-    Returns:
-        The repo URL on the Hub.
-
-    Raises:
-        RuntimeError: With setup instructions if no token is found.
-    """
-    import os
-
-    from huggingface_hub import HfApi
-
-    if token is None:
-        token = os.environ.get("HF_TOKEN")
-    if token is None:
-        raise RuntimeError(
-            "No HF token found. On Kaggle, add a 'HF_TOKEN' secret "
-            "(https://huggingface.co/settings/tokens, write scope) and "
-            "expose it in the notebook:\n"
-            "  from kaggle_secrets import UserSecretsClient\n"
-            "  import os; os.environ['HF_TOKEN'] = UserSecretsClient().get_secret('HF_TOKEN')\n"
-            "Or set os.environ['HF_TOKEN'] = 'hf_...' inline."
-        )
-
-    api = HfApi(token=token)
-    api.create_repo(repo_id, exist_ok=True, private=private)
-    api.upload_folder(
-        folder_path=str(output_dir),
-        repo_id=repo_id,
-        commit_message=commit_message,
-    )
-    return f"https://huggingface.co/{repo_id}"
-
-
-def push_readme_to_hub(
-    readme_path: str | Path,
-    repo_id: str,
-    *,
-    commit_message: str = "Update README",
-    token: str | None = None,
-) -> str:
-    """Upload a single README file to an existing HF repo (no full re-upload)."""
-    import os
-
-    from huggingface_hub import HfApi
-
-    if token is None:
-        token = os.environ.get("HF_TOKEN")
-    if token is None:
-        raise RuntimeError(
-            "No HF token found. Set os.environ['HF_TOKEN'] = 'hf_...' or pass token=."
-        )
-
-    api = HfApi(token=token)
-    api.upload_file(
-        path_or_fileobj=str(readme_path),
-        path_in_repo="README.md",
-        repo_id=repo_id,
-        commit_message=commit_message,
-    )
-    return f"https://huggingface.co/{repo_id}"
