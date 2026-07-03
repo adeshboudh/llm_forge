@@ -1,0 +1,42 @@
+{
+  "eos_token": {
+    "content": "<|endoftext|>",
+    "id": 0,
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
+  "pad_token": {
+    "content": "<|pad|>",
+    "id": 1,
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
+  "unk_token": {
+    "content": "<|unk|>",
+    "id": 2,
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
+  "bos_token": {
+    "content": "<|bos|>",
+    "id": 3,
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
+  "eos_token_alt": {
+    "content": "<|eos|>",
+    "id": 4,
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  }
+}

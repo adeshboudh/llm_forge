@@ -65,6 +65,55 @@ def load_params_safetensors(path: str | Path) -> dict[str, np.ndarray]:
     return load_file(str(path))
 
 
+def load_params_into_model(path: str | Path, model) -> dict:
+    """Load a .safetensors file and reshape it into a flax-apply-ready dict.
+
+    Two gotchas handled here so callers don't trip on them:
+
+    1. The saved keys carry a leading ``params/`` prefix (because
+       ``state.params`` is wrapped in a flax collection when saved).
+       We strip that prefix so the unflatten aligns with the structure
+       returned by ``model.init(...)['params']``.
+    2. ``model.apply`` expects ``{'params': pytree}``, not the bare pytree.
+
+    Args:
+        path: Path to ``params.safetensors``.
+        model: A flax model instance (e.g. ``LM(config=cfg)``).
+
+    Returns:
+        A flax-apply-ready dict ``{'params': <pytree>}``.
+    """
+    import jax
+    import jax.numpy as jnp
+    import jax.tree_util as jtu
+
+    flat = load_params_safetensors(path)
+    flat = {k.removeprefix("params/"): v for k, v in flat.items()}
+
+    sample = model.init(jax.random.PRNGKey(0), jnp.zeros((1, 4), dtype=jnp.int32), jnp.zeros((1, 4), dtype=jnp.int32))["params"]
+    init_leaves = jax.tree_util.tree_flatten_with_path(sample)
+    structure = init_leaves[1]
+    init_keys = ["/".join(str(p.key) for p in p_) for p_, _ in init_leaves[0]]
+    missing = [k for k in init_keys if k not in flat]
+    if missing:
+        raise KeyError(
+            f"safetensors is missing {len(missing)} param(s); first: {missing[:3]}. "
+            "Did the file come from a different model config?"
+        )
+    leaves = [jnp.asarray(flat[k]) for k in init_keys]
+    pytree = jtu.tree_unflatten(structure, leaves)
+    sample_leaves = jtu.tree_leaves(sample)
+    loaded_leaves = jtu.tree_leaves(pytree)
+    for name, s, l in zip(init_keys, sample_leaves, loaded_leaves):
+        if tuple(s.shape) != tuple(l.shape):
+            raise ValueError(
+                f"shape mismatch for {name!r}: saved={tuple(s.shape)} vs "
+                f"model={tuple(l.shape)}. Check that the safetensors was "
+                f"produced from the same model config."
+            )
+    return {"params": pytree}
+
+
 def export_state_params(state, path: str | Path) -> None:
     """Convenience: pull ``state.params`` and write to .safetensors."""
     save_params_safetensors(state.params, path)

@@ -94,3 +94,44 @@ def test_export_state_params_helper(toy_config, tmp_path):
 def test_load_missing_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_params_safetensors(tmp_path / "nope.safetensors")
+
+
+def test_load_params_into_model_round_trip(toy_config, tmp_path):
+    """Save then load via the high-level helper, then apply the model."""
+    import jax
+    import jax.numpy as jnp
+
+    from training.export import load_params_into_model
+
+    model_cfg = _model_cfg()
+    model = LM(config=model_cfg)
+    state = create_train_state(jax.random.PRNGKey(0), model, toy_config, model_cfg)
+    path = tmp_path / "params.safetensors"
+    save_params_safetensors(state.params, path)
+
+    loaded = load_params_into_model(path, model)
+    assert "params" in loaded
+    prompt = jnp.array([[3, 4, 5, 6]], dtype=jnp.int32)
+    loss, logits = model.apply(loaded, prompt, prompt, return_logits=True)
+    assert logits.shape == (1, 4, model_cfg.vocab_size)
+    assert jnp.isfinite(loss).all()
+
+
+def test_load_params_into_model_wrong_config_raises(toy_config, tmp_path):
+    """Mismatched config should fail with a clear KeyError."""
+    import jax
+    from model.config import load_model_config
+
+    from training.export import load_params_into_model
+
+    model_cfg = _model_cfg()
+    model = LM(config=model_cfg)
+    state = create_train_state(jax.random.PRNGKey(0), model, toy_config, model_cfg)
+    path = tmp_path / "params.safetensors"
+    save_params_safetensors(state.params, path)
+
+    # build a model with a different d_model
+    other_cfg = dataclasses.replace(model_cfg, d_model=128, n_heads=2)
+    other_model = LM(config=other_cfg)
+    with pytest.raises(ValueError, match="shape mismatch"):
+        load_params_into_model(path, other_model)

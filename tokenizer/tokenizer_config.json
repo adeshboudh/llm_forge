@@ -1,0 +1,31 @@
+{
+  "add_prefix_space": false,
+  "eos_token": "<|endoftext|>",
+  "pad_token": "<|pad|>",
+  "unk_token": "<|unk|>",
+  "bos_token": "<|bos|>",
+  "model_max_length": 1024,
+  "tokenizer_class": "PreTrainedTokenizerFast",
+  "special_tokens": {
+    "<|endoftext|>": {
+      "id": 0,
+      "content": "<|endoftext|>"
+    },
+    "<|pad|>": {
+      "id": 1,
+      "content": "<|pad|>"
+    },
+    "<|unk|>": {
+      "id": 2,
+      "content": "<|unk|>"
+    },
+    "<|bos|>": {
+      "id": 3,
+      "content": "<|bos|>"
+    },
+    "<|eos|>": {
+      "id": 4,
+      "content": "<|eos|>"
+    }
+  }
+}
