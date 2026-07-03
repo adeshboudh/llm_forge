@@ -9,6 +9,8 @@ Updated manually after each significant milestone.
 
 **Status:** All code written, tested, trained. Tokenizer committed to git.
 
+> Detailed retro: [`notes/phase1-tokenizer/README.md`](../notes/phase1-tokenizer/README.md)
+
 ### What's done
 
 | Artifact              | Location                                      | Notes                                 |
@@ -51,6 +53,8 @@ Updated manually after each significant milestone.
 
 **Status:** All code written, tested, shards generated and pushed to Kaggle.
 First run overshot the 10B budget by 7.5% (mid-shard flush race). Hard-cap fix landed afterward; future runs land at exactly the budget.
+
+> Detailed retro: [`notes/phase2-data/README.md`](../notes/phase2-data/README.md)
 
 ### What's done
 
@@ -111,6 +115,8 @@ First run overshot the 10B budget by 7.5% (mid-shard flush race). Hard-cap fix l
 
 **Status:** All code written, tested. Llama-style LM forward pass works for all three sizes (25M/125M/350M) with all three attention variants (MHA/MQA/GQA).
 
+> Detailed retro: [`notes/phase3-model/README.md`](../notes/phase3-model/README.md)
+
 ### What's done
 
 | Artifact               | Location                                   | Notes                              |
@@ -157,6 +163,8 @@ Note: d_ff values are computed from `compute_d_ff(d_model)` per Llama 8/3·D for
 
 **Status:** Training stack built and CPU-smoke-validated end-to-end on `model_25m` (5 steps). Full 1B-token Kaggle TPU run launched from `notebooks/phase4-training/train_25m.ipynb`.
 
+> Detailed retro: [`notes/phase4-training/README.md`](../notes/phase4-training/README.md)
+
 ### What's done
 
 | Artifact            | Location                                | Notes                                    |
@@ -202,7 +210,11 @@ Note: d_ff values are computed from `compute_d_ff(d_model)` per Llama 8/3·D for
 
 ## Phase 5 — Post-Training 🔒 BLOCKED on Phase 4
 
+> Placeholder: [`notes/phase5-posttraining/README.md`](../notes/phase5-posttraining/README.md) (to be filled in)
+
 ## Phase 6 — Inference 🔒 BLOCKED on Phase 4
+
+> Placeholder: [`notes/phase6-inference/README.md`](../notes/phase6-inference/README.md) (to be filled in)
 
 ---
 
