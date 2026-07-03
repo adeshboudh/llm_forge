@@ -235,3 +235,32 @@ def push_to_hub(
         commit_message=commit_message,
     )
     return f"https://huggingface.co/{repo_id}"
+
+
+def push_readme_to_hub(
+    readme_path: str | Path,
+    repo_id: str,
+    *,
+    commit_message: str = "Update README",
+    token: str | None = None,
+) -> str:
+    """Upload a single README file to an existing HF repo (no full re-upload)."""
+    import os
+
+    from huggingface_hub import HfApi
+
+    if token is None:
+        token = os.environ.get("HF_TOKEN")
+    if token is None:
+        raise RuntimeError(
+            "No HF token found. Set os.environ['HF_TOKEN'] = 'hf_...' or pass token=."
+        )
+
+    api = HfApi(token=token)
+    api.upload_file(
+        path_or_fileobj=str(readme_path),
+        path_in_repo="README.md",
+        repo_id=repo_id,
+        commit_message=commit_message,
+    )
+    return f"https://huggingface.co/{repo_id}"

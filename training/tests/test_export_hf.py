@@ -226,3 +226,43 @@ def test_push_to_hub_reads_hf_token_env(monkeypatch, tmp_path):
     assert captured["token"] == "hf_fake_test_token"
     assert captured["repo_id"] == "fake/repo"
     assert captured["private"] is True
+
+
+def test_push_readme_to_hub(monkeypatch, tmp_path):
+    """push_readme_to_hub uploads a single file without re-pushing the dir."""
+    import huggingface_hub
+    from training.export_hf import push_readme_to_hub
+
+    monkeypatch.setenv("HF_TOKEN", "hf_fake")
+
+    captured = {}
+
+    class FakeApi:
+        def __init__(self, token=None):
+            pass
+
+        def upload_file(self, path_or_fileobj, path_in_repo, repo_id, commit_message):
+            captured["path"] = path_or_fileobj
+            captured["path_in_repo"] = path_in_repo
+            captured["repo_id"] = repo_id
+            captured["msg"] = commit_message
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    readme = tmp_path / "README.md"
+    readme.write_text("---\nlicense: apache-2.0\n---\n# hi\n")
+    url = push_readme_to_hub(readme, "fake/repo", commit_message="fix frontmatter")
+    assert url == "https://huggingface.co/fake/repo"
+    assert captured["path_in_repo"] == "README.md"
+    assert captured["repo_id"] == "fake/repo"
+    assert "fix frontmatter" in captured["msg"]
+
+
+def test_push_readme_raises_without_token(monkeypatch, tmp_path):
+    """No token -> clear RuntimeError, like push_to_hub."""
+    from training.export_hf import push_readme_to_hub
+
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    readme = tmp_path / "README.md"
+    readme.write_text("x")
+    with pytest.raises(RuntimeError, match="No HF token found"):
+        push_readme_to_hub(readme, "fake/repo")
