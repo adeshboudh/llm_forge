@@ -130,13 +130,24 @@ def train(config: TrainConfig, resume_path: Path | None = None) -> list[float]:
 
             save(state, Path(config.ckpt.output_dir) / f"step_{total_steps:010d}_final")
             from training.export import export_state_params
-            export_state_params(
-                state, Path(config.ckpt.output_dir) / f"step_{total_steps:010d}_final" / "params.safetensors"
+            from training.export_hf import export_hf
+
+            final_dir = Path(config.ckpt.output_dir) / f"step_{total_steps:010d}_final"
+            export_state_params(state, final_dir / "params.safetensors")
+            export_hf(
+                model_cfg,
+                state.params,
+                final_dir / "hf",
+                tokens_trained=int(state.step) * config.train.batch_size * config.dataset.seq_len,
+                num_steps=int(state.step),
+                final_loss=float(losses[-1]) if losses else None,
+                repo_id=f"adesh01/llm_forge-{config.model_name.replace('model_', '')}",
             )
     except RuntimeError as e:
         emergency_path = Path(config.ckpt.output_dir) / f"emergency_{int(state.step):010d}"
         save(state, emergency_path)
         from training.export import export_state_params
+
         export_state_params(state, emergency_path / "params.safetensors")
         log_file.write(
             json.dumps({"event": "preemption", "step": int(state.step), "err": str(e)}) + "\n"

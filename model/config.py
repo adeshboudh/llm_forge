@@ -43,6 +43,32 @@ class ModelConfig:
         """Q heads per KV head (GQA repeat factor)."""
         return self.n_heads // self.n_kv_heads
 
+    def to_hf_dict(self) -> dict:
+        """Serialize to a HuggingFace-Llama-style config dict.
+
+        Keys mirror LlamaConfig (transformers>=4.40) so the file is
+        loadable by HF `LlamaForCausalLM.from_pretrained(...)` after
+        parameter reshaping (future work in Phase 6).
+        """
+        return {
+            "architectures": ["LlamaForCausalLM"],
+            "model_type": "llama",
+            "hidden_size": self.d_model,
+            "intermediate_size": self.d_ff,
+            "num_attention_heads": self.n_heads,
+            "num_hidden_layers": self.n_layers,
+            "num_key_value_heads": self.n_kv_heads,
+            "vocab_size": self.vocab_size,
+            "max_position_embeddings": self.max_seq_len,
+            "rope_theta": self.theta_base,
+            "rms_norm_eps": 1e-6,
+            "tie_word_embeddings": self.tied_embeddings,
+            "attention_bias": False,
+            "mlp_bias": False,
+            "torch_dtype": "float32",
+            "transformers_version": "4.40+",
+        }
+
 
 _CONFIGS_DIR = Path(__file__).resolve().parent.parent / "configs" / "models"
 
